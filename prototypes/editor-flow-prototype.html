@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PROTOTYPE · Editor flow</title>
+<!--
+  THROWAWAY PROTOTYPE for the wayfinder ticket "Editor flow prototype"
+  (https://github.com/christiankammerer/picturesque/issues/6). Not production code.
+
+  Plan: three structurally different editor flows, switchable via ?variant=A|B|C
+  and the floating bottom bar (or the ← / → keys):
+    A  Step-by-step wizard
+    B  Three-pane workspace (whole Seamless Carousel visible as one strip)
+    C  Slide focus + filmstrip (one Slide at a time, neighbours peek in)
+
+  Open the file in a browser; no build step. State is in memory only.
+  All three variants share one renderer, `strip()`, mirroring the decided
+  architecture (one renderer for preview and export).
+-->
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1d1d1f;background:#f6f5f2;height:100vh;overflow:hidden}
+  button,select,input{font:inherit}
+  button{cursor:pointer;border:1px solid #d0cdc6;background:#fff;border-radius:8px;padding:6px 12px}
+  button.primary{background:#1d1d1f;color:#fff;border-color:#1d1d1f}
+  button.on{background:#1d1d1f;color:#fff;border-color:#1d1d1f}
+  button:disabled{opacity:.4;cursor:default}
+  h2{margin:0 0 12px;font-size:20px} h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#77736b}
+  .muted{color:#77736b;font-size:12px}
+  #app{height:100vh}
+
+  /* shared: strip renderer */
+  .strip{position:relative;flex:none;box-shadow:0 2px 12px rgba(0,0,0,.12);user-select:none}
+  .cell{position:absolute;overflow:hidden;background:#e4e1da}
+  .cell img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+  .cell.empty.ia{background:repeating-linear-gradient(45deg,#e9e6df,#e9e6df 8px,#e1ded6 8px,#e1ded6 16px);display:flex;align-items:center;justify-content:center;color:#9a958b;font-size:22px;cursor:pointer}
+  .cell.ia:not(.empty){cursor:grab}
+  .cell.sel{outline:3px solid #2f6bff;outline-offset:-3px;z-index:2}
+  .cell.over{outline:3px dashed #2f6bff;outline-offset:-3px}
+  .bound{position:absolute;top:-10px;bottom:-10px;width:0;border-left:2px dashed #ff3b6b;pointer-events:none;z-index:3}
+  .slabel{position:absolute;top:-22px;font-size:11px;font-weight:600;color:#ff3b6b;pointer-events:none}
+  .dim{position:absolute;top:0;bottom:0;background:rgba(20,20,24,.55);pointer-events:none;z-index:4}
+
+  /* shared: photo tray, controls, thumbs */
+  .tray{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+  .tray.row{display:flex;overflow-x:auto;gap:6px}
+  .ph{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;cursor:grab;border:2px solid transparent;flex:none;width:64px}
+  .tray:not(.row) .ph{width:auto}
+  .ph img{width:100%;height:100%;object-fit:cover;display:block}
+  .ph.picked{border-color:#2f6bff}
+  .ph .used{position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.6);color:#fff;font-size:9px;padding:1px 4px;border-radius:4px}
+  .ctl{display:grid;grid-template-columns:110px 1fr;gap:8px 10px;align-items:center;margin-bottom:12px}
+  .ctl input[type=range]{width:100%}
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .tcard{border:2px solid transparent;border-radius:10px;padding:8px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .tcard.on{border-color:#2f6bff}
+  .thumb{position:relative;background:#fff;outline:1px solid #d9d6cf}
+  .thumb i{position:absolute;background:#c9c5bc;border-radius:1px}
+  .thumb b{position:absolute;top:0;bottom:0;border-left:1px dashed #ff3b6b}
+  .file{display:inline-block;border:1px solid #d0cdc6;background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer}
+  .file input{display:none}
+
+  /* preview modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
+  .phone{background:#111;border-radius:36px;padding:56px 10px 24px;width:340px;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .phone .vp{position:relative;overflow:hidden;width:320px;background:#000}
+  .phone .vp .inner{position:absolute;top:0;left:0;transition:transform .25s}
+  .dots{display:flex;gap:4px;justify-content:center;margin:10px 0}
+  .dots span{width:6px;height:6px;border-radius:50%;background:#555}.dots span.on{background:#3d8bff}
+  .gridcrop{position:absolute;box-shadow:0 0 0 999px rgba(0,0,0,.6);outline:2px solid #ffd60a;z-index:5;pointer-events:none}
+
+  /* switcher + state */
+  #switcher{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#111;color:#fff;border-radius:999px;padding:6px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);z-index:100;font-size:13px}
+  #switcher button{background:#2a2a2e;color:#fff;border:none;border-radius:999px;width:30px;height:30px;padding:0}
+  #switcher .tag{background:#ffd60a;color:#111;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px}
+  #state{position:fixed;left:12px;bottom:12px;z-index:99;background:#fff;border:1px solid #d0cdc6;border-radius:8px;max-width:420px;font-size:11px}
+  #state summary{cursor:pointer;padding:6px 10px;font-weight:600}
+  #state pre{margin:0;padding:0 10px 10px;max-height:40vh;overflow:auto}
+
+  /* A: wizard */
+  .wz{display:flex;flex-direction:column;height:100%}
+  .wz .steps{display:flex;gap:4px;padding:14px 20px;background:#fff;border-bottom:1px solid #e5e2db}
+  .wz .steps button{border:none;background:none;color:#9a958b;font-weight:600}
+  .wz .steps button.on{color:#1d1d1f;background:#efede8}
+  .wz .steps button.done{color:#1d1d1f}
+  .wz .body{flex:1;overflow:auto;padding:24px 28px 90px}
+  .wz .nav{position:fixed;right:20px;bottom:14px;display:flex;gap:8px;z-index:60}
+  .bigcards{display:grid;grid-template-columns:repeat(3,minmax(0,260px));gap:16px}
+  .bigcard{background:#fff;border:2px solid #e5e2db;border-radius:14px;padding:18px;cursor:pointer}
+  .bigcard.on{border-color:#2f6bff}
+  .bigcard .ill{height:90px;display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:10px}
+  .bigcard .ill span{background:#c9c5bc;display:block}
+  .split{display:flex;gap:24px;height:100%}
+  .split .canvasHost{flex:1;min-width:0}
+  .split .side{width:300px;flex:none;overflow:auto}
+
+  /* B: workspace */
+  .ws{display:grid;grid-template-rows:auto 1fr;grid-template-columns:250px 1fr 270px;height:100%}
+  .ws .top{grid-column:1/4;display:flex;gap:8px;align-items:center;padding:10px 14px;background:#fff;border-bottom:1px solid #e5e2db}
+  .ws .top .brand{font-weight:800;margin-right:10px}
+  .seg{display:inline-flex;border:1px solid #d0cdc6;border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0;border-right:1px solid #d0cdc6}.seg button:last-child{border-right:none}
+  .ws .left,.ws .right{background:#fff;overflow:auto;padding:14px}
+  .ws .left{border-right:1px solid #e5e2db}.ws .right{border-left:1px solid #e5e2db}
+  .ws .center{overflow:auto;display:flex;flex-direction:column;align-items:center;padding:40px 30px 90px}
+  .tabs{display:flex;gap:4px;margin-bottom:12px}
+  .stepper{display:inline-flex;align-items:center;gap:6px}
+  .stepper button{padding:4px 9px}
+
+  /* C: slide focus (dark) */
+  .sf{height:100%;background:#17171a;color:#eee;display:flex;flex-direction:column}
+  .sf button{background:#2a2a2e;color:#eee;border-color:#3a3a40}
+  .sf button.on,.sf button.primary{background:#eee;color:#111;border-color:#eee}
+  .sf select{background:#2a2a2e;color:#eee;border:1px solid #3a3a40;border-radius:8px;padding:6px}
+  .sf .muted{color:#9a9aa3}
+  .sf .file{background:#2a2a2e;color:#eee;border-color:#3a3a40}
+  .sf .top{display:flex;gap:8px;align-items:center;padding:12px 16px}
+  .sf .stage{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;min-height:0}
+  .sf .vp{position:relative;overflow:hidden;height:100%}
+  .sf .vp .inner{position:absolute;top:50%;transition:transform .25s}
+  .sf .arrow{width:44px;height:44px;border-radius:50%;font-size:18px;padding:0}
+  .sf .bottom{padding:8px 16px 70px;display:flex;flex-direction:column;gap:10px}
+  .film{display:flex;gap:8px;align-items:center;overflow-x:auto;padding:4px}
+  .film .fs{flex:none;position:relative;overflow:hidden;cursor:pointer;outline:2px solid transparent;border-radius:3px}
+  .film .fs.on{outline-color:#3d8bff}
+  .film .fs .n{position:absolute;left:3px;top:2px;font-size:10px;font-weight:700;color:#fff;text-shadow:0 0 3px #000;z-index:6}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:320px;background:#222226;color:#eee;padding:18px;overflow:auto;z-index:40;box-shadow:-10px 0 30px rgba(0,0,0,.4)}
+  .drawer .tcard{background:#2e2e33}.drawer .thumb{background:#3a3a40;outline-color:#555}.drawer .thumb i{background:#77767d}
+  .drawer h3{color:#9a9aa3}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<details id="state"><summary>State</summary><pre></pre></details>
+<div id="switcher"><span class="tag">PROTOTYPE</span><button id="prev" title="Previous variant (←)">‹</button><span id="vlabel"></span><button id="next" title="Next variant (→)">›</button></div>
+
+<script>
+// ---------- tiny DOM helper ----------
+const $ = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'class') e.className = v;
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+};
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const R = n => [...Array(n).keys()];
+const near = (a, b) => Math.abs(a - b) < 1e-6;
+const isInt = v => near(v, Math.round(v));
+
+// ---------- domain ----------
+const RATIOS = { '1:1': 1, '4:5': 5 / 4, '3:4': 4 / 3, '9:16': 16 / 9 }; // height / width
+const RINFO = { '1:1': '1080×1080', '4:5': '1080×1350', '3:4': '1080×1440 · native feed ratio since 2025', '9:16': '1080×1920 · Stories only — cropped in the feed' };
+const TYPES = {
+  collage: { name: 'Collage', desc: 'One image, several photos arranged by a Layout.' },
+  carousel: { name: 'Carousel', desc: 'Up to 20 Slides people swipe through; each Slide stands alone.' },
+  seamless: { name: 'Seamless Carousel', desc: 'One wide canvas cut into Slides; photos can cross Slide edges.' },
+};
+// Templates: cells as [x, y, w, h]; x/w in Slide widths, y/h in Slide heights.
+const T = [
+  { id: 'grid', name: 'Grid 2×2', types: ['collage'], gen: () => [[0, 0, .5, .5], [.5, 0, .5, .5], [0, .5, .5, .5], [.5, .5, .5, .5]] },
+  { id: 'hero', name: 'Hero + 2', types: ['collage'], gen: () => [[0, 0, 1, .62], [0, .62, .5, .38], [.5, .62, .5, .38]] },
+  { id: 'mosaic', name: 'Mosaic', types: ['collage'], gen: () => [[0, 0, .6, 1], [.6, 0, .4, 1 / 3], [.6, 1 / 3, .4, 1 / 3], [.6, 2 / 3, .4, 1 / 3]] },
+  { id: 'trio', name: 'Three columns', types: ['collage'], gen: () => [[0, 0, 1 / 3, 1], [1 / 3, 0, 1 / 3, 1], [2 / 3, 0, 1 / 3, 1]] },
+  { id: 'full', name: 'One per Slide', types: ['carousel'], gen: n => R(n).map(i => [i, 0, 1, 1]) },
+  { id: 'duo', name: 'Two per Slide', types: ['carousel'], gen: n => R(n).flatMap(i => [[i, 0, 1, .5], [i, .5, 1, .5]]) },
+  { id: 'mix', name: 'Mixed rhythm', types: ['carousel'], gen: n => R(n).flatMap(i => i % 3 == 0 ? [[i, 0, 1, 1]] : i % 3 == 1 ? [[i, 0, .5, 1], [i + .5, 0, .5, 1]] : [[i, 0, 1, .6], [i, .6, .5, .4], [i + .5, .6, .5, .4]]) },
+  { id: 'pano', name: 'Panorama', types: ['seamless'], gen: n => [[0, 0, n, 1]] },
+  { id: 'bridge', name: 'Bridges', types: ['seamless'], gen: n => [[0, 0, .5, .5], ...R(n - 1).map(i => [i + .5, 0, 1, .5]), [n - .5, 0, .5, .5], ...R(n).map(i => [i, .5, 1, .5])] },
+  { id: 'stagger', name: 'Stagger', types: ['seamless'], gen: n => R(n).flatMap(i => [[i + .3, .08, Math.min(.95, n - i - .3), .58], [i + .06, .72, .5, .22]]) },
+  { id: 'panostrip', name: 'Panorama + strip', types: ['seamless'], gen: n => [[0, 0, n, .64], ...R(n).flatMap(i => [[i, .64, .5, .36], [i + .5, .64, .5, .36]])] },
+];
+
+function makePhoto(i) {
+  const w = i % 3 == 0 ? 400 : 600, h = i % 3 == 0 ? 600 : 400;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'), hue = (i * 47) % 360;
+  const gr = g.createLinearGradient(0, 0, 0, h);
+  gr.addColorStop(0, `hsl(${hue},70%,72%)`); gr.addColorStop(1, `hsl(${(hue + 40) % 360},60%,45%)`);
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = `hsl(${(hue + 180) % 360},80%,85%)`; g.beginPath();
+  g.arc(w * (.2 + .6 * ((i * 37) % 10) / 10), h * .3, Math.min(w, h) * .12, 0, 7); g.fill();
+  for (let k = 0; k < 3; k++) {
+    g.fillStyle = `hsla(${(hue + 200 + k * 20) % 360},35%,${30 - k * 7}%,.85)`; g.beginPath(); g.moveTo(0, h);
+    for (let x = 0; x <= w; x += w / 8) g.lineTo(x, h * (.55 + .12 * k) + Math.sin(x / w * 6 + i + k) * h * .08);
+    g.lineTo(w, h); g.fill();
+  }
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.font = `bold ${h * .08}px sans-serif`; g.fillText('Photo ' + (i + 1), w * .05, h * .12);
+  return { id: 'p' + i, name: 'Photo ' + (i + 1), url: c.toDataURL('image/jpeg', .85) };
+}
+const PH = R(10).map(makePhoto);
+const photo = id => PH.find(p => p.id === id);
+
+// ---------- state ----------
+const S = { type: 'seamless', ratio: '4:5', slides: 3, template: null, cells: [], gap: 12, radius: 0, border: 0, borderColor: '#ffffff', bg: '#f4f1ea',
+  sel: null, pick: null, step: 0, cur: 0, tab: 'templates', drawer: null };
+const tmpl = () => T.find(t => t.id === S.template);
+
+function applyTemplate(id) {
+  const old = S.cells.filter(c => c.photo).map(({ photo, fx, fy, zoom }) => ({ photo, fx, fy, zoom }));
+  S.template = id;
+  S.cells = tmpl().gen(S.slides).map(([x, y, w, h], i) => ({ x, y, w, h, photo: null, fx: 50, fy: 50, zoom: 1, ...(old[i] || {}) }));
+  S.sel = null; S.cur = clamp(S.cur, 0, S.slides - 1);
+}
+function setType(t) {
+  S.type = t;
+  if (t === 'collage') S.slides = 1; else if (S.slides < 2) S.slides = 3;
+  applyTemplate(T.find(x => x.types.includes(t)).id);
+}
+function setSlides(n) { if (S.type === 'collage') return; S.slides = clamp(n, 2, 20); applyTemplate(S.template); }
+function setRatio(r) { S.ratio = r; }
+function autoFill() {
+  const used = new Set(S.cells.map(c => c.photo));
+  const free = PH.filter(p => !used.has(p.id));
+  S.cells.forEach(c => { if (!c.photo && free.length) Object.assign(c, { photo: free.shift().id, fx: 50, fy: 50, zoom: 1 }); });
+}
+function exportStub() {
+  const h = Math.round(1080 * RATIOS[S.ratio]);
+  const files = S.type === 'collage' ? ['picturesque.jpg'] : R(S.slides).map(i => `picturesque-${String(i + 1).padStart(2, '0')}.jpg`);
+  alert(`PROTOTYPE export (nothing is written)\n\n${files.length} file(s) at 1080×${h}, sRGB JPEG:\n` + files.join('\n'));
+}
+setType('seamless'); applyTemplate('bridge'); autoFill(); // start filled, so Slide-crossing cells are visible at once
+
+// ---------- shared renderer: one strip for preview + (later) export ----------
+function strip(slideW, { interactive = true, bounds = true, focus = null } = {}) {
+  const n = S.slides, H = slideW * RATIOS[S.ratio], k = slideW / 1080, g = S.gap * k;
+  const insX = v => near(v, 0) || near(v, n) || (isInt(v) && S.type !== 'seamless') ? g : g / 2; // a Slide edge in a plain Carousel acts like an outer edge
+  const insY = v => near(v, 0) || near(v, 1) ? g : g / 2;
+  const w = $('div', { class: 'strip', style: { width: n * slideW + 'px', height: H + 'px', background: S.bg } });
+  S.cells.forEach((c, i) => {
+    const L = c.x * slideW + insX(c.x), Rt = (c.x + c.w) * slideW - insX(c.x + c.w);
+    const Tp = c.y * H + insY(c.y), B = (c.y + c.h) * H - insY(c.y + c.h);
+    const cell = $('div', {
+      class: 'cell' + (c.photo ? '' : ' empty') + (interactive ? ' ia' : '') + (interactive && S.sel === i ? ' sel' : ''),
+      style: { left: L + 'px', top: Tp + 'px', width: Math.max(0, Rt - L) + 'px', height: Math.max(0, B - Tp) + 'px',
+        borderRadius: S.radius * k + 'px', border: S.border ? `${S.border * k}px solid ${S.borderColor}` : 'none' },
+    }, c.photo ? null : interactive ? '+' : null);
+    if (c.photo) cell.append($('img', { src: photo(c.photo).url, draggable: 'false',
+      style: { objectPosition: `${c.fx}% ${c.fy}%`, transformOrigin: `${c.fx}% ${c.fy}%`, transform: `scale(${c.zoom})` } }));
+    if (interactive) wireCell(cell, c, i);
+    w.append(cell);
+  });
+  if (bounds && n > 1) {
+    R(n).forEach(i => w.append($('div', { class: 'slabel', style: { left: i * slideW + 4 + 'px' } }, `Slide ${i + 1}`)));
+    R(n - 1).forEach(i => w.append($('div', { class: 'bound', style: { left: (i + 1) * slideW - 1 + 'px' } })));
+  }
+  if (focus != null) R(n).forEach(j => j !== focus && w.append($('div', { class: 'dim', style: { left: j * slideW + 'px', width: slideW + 'px' } })));
+  return w;
+}
+function wireCell(cell, c, i) {
+  cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('over'); });
+  cell.addEventListener('dragleave', () => cell.classList.remove('over'));
+  cell.addEventListener('drop', e => {
+    e.preventDefault(); const id = e.dataTransfer.getData('text/plain');
+    if (id) { Object.assign(c, { photo: id, fx: 50, fy: 50, zoom: 1 }); S.sel = i; render(); }
+  });
+  cell.addEventListener('pointerdown', e => {
+    const sx = e.clientX, sy = e.clientY, fx0 = c.fx, fy0 = c.fy, rw = cell.clientWidth, rh = cell.clientHeight, img = cell.querySelector('img');
+    let moved = false;
+    const mv = ev => {
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!moved && Math.hypot(dx, dy) > 3) moved = true;
+      if (moved && img) {
+        c.fx = clamp(fx0 - dx / rw * 100 / c.zoom, 0, 100); c.fy = clamp(fy0 - dy / rh * 100 / c.zoom, 0, 100);
+        img.style.objectPosition = img.style.transformOrigin = `${c.fx}% ${c.fy}%`;
+      }
+    };
+    const up = () => {
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up);
+      if (moved) return paint();
+      if (S.pick) { Object.assign(c, { photo: S.pick, fx: 50, fy: 50, zoom: 1 }); S.pick = null; }
+      S.sel = i; render();
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up);
+  });
+  cell.addEventListener('wheel', e => {
+    if (!c.photo) return; e.preventDefault();
+    c.zoom = clamp(c.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08), 1, 4);
+    cell.querySelector('img').style.transform = `scale(${c.zoom})`; showState();
+  }, { passive: false });
+  cell.addEventListener('dblclick', () => { c.photo = null; render(); });
+}
+
+// ---------- shared widgets ----------
+function thumb(t, maxW = 140) {
+  const n = S.slides, r = RATIOS[S.ratio];
+  let sw = Math.min(maxW / n, 70), H = sw * r; if (H > 80) { H = 80; sw = H / r; }
+  const d = $('div', { class: 'thumb', style: { width: sw * n + 'px', height: H + 'px' } });
+  t.gen(n).forEach(([x, y, w, h]) => d.append($('i', { style: { left: x * sw + 1.5 + 'px', top: y * H + 1.5 + 'px', width: w * sw - 3 + 'px', height: h * H - 3 + 'px' } })));
+  R(n - 1).forEach(i => d.append($('b', { style: { left: (i + 1) * sw + 'px' } })));
+  return d;
+}
+function templatePicker(maxW) {
+  return $('div', { class: 'thumbs' }, T.filter(t => t.types.includes(S.type)).map(t =>
+    $('div', { class: 'tcard' + (S.template === t.id ? ' on' : ''), onclick: () => { applyTemplate(t.id); render(); } }, thumb(t, maxW), $('div', {}, t.name))));
+}
+function photoTray(row = false) {
+  const used = new Set(S.cells.map(c => c.photo));
+  return $('div', {},
+    $('div', { style: { display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' } },
+      $('button', { onclick: () => { autoFill(); render(); } }, 'Auto-fill'),
+      $('label', { class: 'file' }, 'Add your photos…', $('input', { type: 'file', multiple: true, accept: 'image/*', onchange: e => {
+        [...e.target.files].forEach((f, i) => PH.push({ id: 'u' + Date.now() + i, name: f.name, url: URL.createObjectURL(f) })); render();
+      } }))),
+    $('div', { class: 'tray' + (row ? ' row' : '') }, PH.map(p =>
+      $('div', { class: 'ph' + (S.pick === p.id ? ' picked' : ''), draggable: 'true', title: p.name,
+        ondragstart: e => e.dataTransfer.setData('text/plain', p.id),
+        onclick: () => { S.pick = S.pick === p.id ? null : p.id; render(); } },
+        $('img', { src: p.url, draggable: 'false' }), used.has(p.id) ? $('span', { class: 'used' }, 'used') : null))),
+    $('p', { class: 'muted' }, S.pick ? 'Now click a cell to place the picked photo.' : 'Drag a photo onto a cell, or click a photo and then a cell.'));
+}
+function range(label, val, min, max, step, on) {
+  return [$('label', {}, label), $('input', { type: 'range', min, max, step, value: val, oninput: e => { on(+e.target.value); paint(); } })];
+}
+function styleControls() {
+  return $('div', { class: 'ctl' },
+    range('Gap', S.gap, 0, 60, 1, v => S.gap = v),
+    range('Corner radius', S.radius, 0, 80, 1, v => S.radius = v),
+    range('Border', S.border, 0, 30, 1, v => S.border = v),
+    $('label', {}, 'Border colour'), $('input', { type: 'color', value: S.borderColor, oninput: e => { S.borderColor = e.target.value; paint(); } }),
+    $('label', {}, 'Background'), $('input', { type: 'color', value: S.bg, oninput: e => { S.bg = e.target.value; paint(); } }));
+}
+function cellControls() {
+  if (S.sel == null) return $('p', { class: 'muted' }, 'Click a cell to select it. Drag a photo inside its cell to pan, scroll to zoom, double-click to empty it.');
+  const c = S.cells[S.sel];
+  if (!c.photo) return $('p', { class: 'muted' }, `Cell ${S.sel + 1} is empty. Drop or pick a photo.`);
+  return $('div', {},
+    $('div', { class: 'ctl' }, range('Zoom', c.zoom, 1, 4, .01, v => c.zoom = v)),
+    $('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } },
+      $('button', { onclick: () => { Object.assign(c, { fx: 50, fy: 50, zoom: 1 }); render(); } }, 'Reset framing'),
+      $('button', { onclick: () => { c.photo = null; render(); } }, 'Remove photo'),
+      $('button', { onclick: () => { S.sel = null; render(); } }, 'Deselect')));
+}
+function ratioSelect() {
+  return $('select', { onchange: e => { setRatio(e.target.value); render(); } },
+    Object.keys(RATIOS).map(r => $('option', { value: r, selected: r === S.ratio }, `${r}  (${RINFO[r].split(' · ')[0]})`)));
+}
+function slideStepper() {
+  if (S.type === 'collage') return null;
+  return $('span', { class: 'stepper' }, $('button', { onclick: () => { setSlides(S.slides - 1); render(); }, disabled: S.slides <= 2 }, '−'),
+    `${S.slides} Slides`, $('button', { onclick: () => { setSlides(S.slides + 1); render(); }, disabled: S.slides >= 20 }, '+'));
+}
+// The canvas host repaints on every style tweak without rebuilding the rest of the shell.
+function canvasHost(place, style = {}) {
+  const host = $('div', { class: 'canvasHost', style });
+  painters.push(() => { host.replaceChildren(place(host)); });
+  return host;
+}
+
+// ---------- phone preview (shared) ----------
+function openPreview() {
+  let k = 0, crop = false;
+  const W = 320, H = W * RATIOS[S.ratio], n = S.slides;
+  const vp = $('div', { class: 'vp', style: { height: H + 'px' } });
+  const dots = $('div', { class: 'dots' }), note = $('div', { class: 'muted', style: { textAlign: 'center', minHeight: '32px' } });
+  const draw = () => {
+    const inner = $('div', { class: 'inner', style: { transform: `translateX(${-k * W}px)` } }, strip(W, { interactive: false, bounds: false }));
+    vp.replaceChildren(inner);
+    if (crop && k === 0) {
+      const r = RATIOS[S.ratio]; let tw = W, th = W * 4 / 3; if (r < 4 / 3) { th = H; tw = H * 3 / 4; }
+      vp.append($('div', { class: 'gridcrop', style: { width: tw + 'px', height: th + 'px', left: (W - tw) / 2 + 'px', top: (H - th) / 2 + 'px' } }));
+    }
+    dots.replaceChildren(...R(n).map(i => $('span', { class: i === k ? 'on' : '' })));
+    note.textContent = S.ratio === '9:16' ? '9:16 is a Stories size: the feed would crop this Post.' : crop ? (k === 0 ? 'Yellow box: what the 3:4 profile grid shows of the first image.' : 'Grid crop only applies to the first image.') : '';
+  };
+  const m = $('div', { class: 'modal', onclick: e => e.target === m && m.remove() },
+    $('div', { class: 'phone' }, vp, dots,
+      $('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' } },
+        $('button', { onclick: () => { k = Math.max(0, k - 1); draw(); } }, '‹'),
+        $('label', { style: { fontSize: '12px' } }, $('input', { type: 'checkbox', onchange: e => { crop = e.target.checked; draw(); } }), ' Profile grid crop'),
+        $('button', { onclick: () => { k = Math.min(n - 1, k + 1); draw(); } }, '›')),
+      note, $('button', { style: { width: '100%', marginTop: '8px' }, onclick: () => m.remove() }, 'Close')));
+  document.body.append(m); draw();
+}
+
+// ---------- Variant A: step-by-step wizard ----------
+const STEPS = ['Post type', 'Size', 'Template', 'Photos', 'Style', 'Preview & export'];
+function variantA(root) {
+  const fit = host => { const n = S.slides, r = RATIOS[S.ratio]; const sw = clamp(Math.min((host.clientWidth - 20) / n, (host.clientHeight - 50) / r), 120, 520); return $('div', { style: { padding: '26px 10px', overflow: 'auto', height: '100%', display: 'flex', justifyContent: n * sw > host.clientWidth ? 'flex-start' : 'center' } }, strip(sw)); };
+  const body = $('div', { class: 'body' });
+  const s = S.step;
+  if (s === 0) body.append($('h2', {}, 'What are you making?'),
+    $('div', { class: 'bigcards' }, Object.entries(TYPES).map(([k, t]) => $('div', { class: 'bigcard' + (S.type === k ? ' on' : ''), onclick: () => { setType(k); render(); } },
+      $('div', { class: 'ill' }, k === 'collage' ? [$('span', { style: { width: '40px', height: '80px' } }), $('span', { style: { width: '36px', height: '38px' } })]
+        : R(3).map(() => $('span', { style: { width: k === 'seamless' ? '50px' : '44px', height: '62px', marginRight: k === 'seamless' ? '-3px' : '6px', background: k === 'seamless' ? 'linear-gradient(90deg,#bdb8ae,#d8d4cb)' : '#c9c5bc' } }))),
+      $('b', {}, t.name), $('p', { class: 'muted' }, t.desc)))),
+    S.type !== 'collage' ? $('p', {}, 'How many Slides? ', slideStepper()) : null);
+  if (s === 1) body.append($('h2', {}, 'Which size?'),
+    $('div', { class: 'bigcards', style: { gridTemplateColumns: 'repeat(4,minmax(0,200px))' } }, Object.keys(RATIOS).map(r => $('div', { class: 'bigcard' + (S.ratio === r ? ' on' : ''), onclick: () => { setRatio(r); render(); } },
+      $('div', { class: 'ill' }, $('span', { style: { width: 70 / Math.max(1, RATIOS[r] / 1.1) + 'px', height: 70 / Math.max(1, RATIOS[r] / 1.1) * RATIOS[r] + 'px' } })),
+      $('b', {}, r), $('p', { class: 'muted' }, RINFO[r])))));
+  if (s === 2) body.append($('h2', {}, 'Pick a Template'), $('p', { class: 'muted' }, 'Photos you have already placed carry over when you switch.'), templatePicker(220));
+  if (s === 3) body.append($('div', { class: 'split' }, canvasHost(fit), $('div', { class: 'side' }, $('h3', {}, 'Photos'), photoTray(), $('h3', {}, 'Selected cell'), cellControls())));
+  if (s === 4) body.append($('div', { class: 'split' }, canvasHost(fit), $('div', { class: 'side' }, $('h3', {}, 'Layout style'), styleControls(), $('h3', {}, 'Selected cell'), cellControls())));
+  if (s === 5) body.append($('h2', {}, 'Check it, then export'),
+    $('p', {}, `${TYPES[S.type].name}, ${S.ratio}, ${S.type === 'collage' ? '1 image' : S.slides + ' Slides'}, Template “${tmpl().name}”, ${S.cells.filter(c => c.photo).length}/${S.cells.length} cells filled.`),
+    $('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } }, $('button', { onclick: openPreview }, 'Preview as post'), $('button', { class: 'primary', onclick: exportStub }, 'Export')),
+    canvasHost(host => { const sw = clamp(Math.min((host.clientWidth - 20) / S.slides, 300), 100, 300); return $('div', { style: { padding: '26px 0', overflow: 'auto' } }, strip(sw, { interactive: false })); }, { height: '60vh' }));
+  if (s >= 3 && s <= 4) body.style.overflow = 'hidden';
+  root.append($('div', { class: 'wz' },
+    $('div', { class: 'steps' }, STEPS.map((t, i) => $('button', { class: i === s ? 'on' : i < s ? 'done' : '', onclick: () => { S.step = i; render(); } }, `${i + 1}. ${t}`))),
+    body,
+    $('div', { class: 'nav' }, $('button', { disabled: s === 0, onclick: () => { S.step--; render(); } }, 'Back'),
+      s < 5 ? $('button', { class: 'primary', onclick: () => { S.step++; render(); } }, 'Next') : null)));
+}
+
+// ---------- Variant B: three-pane workspace ----------
+function variantB(root) {
+  const top = $('div', { class: 'top' }, $('span', { class: 'brand' }, 'Picturesque'),
+    $('span', { class: 'seg' }, Object.entries(TYPES).map(([k, t]) => $('button', { class: S.type === k ? 'on' : '', onclick: () => { setType(k); render(); } }, t.name))),
+    ratioSelect(), slideStepper(), $('span', { style: { flex: 1 } }),
+    $('button', { onclick: openPreview }, 'Preview as post'), $('button', { class: 'primary', onclick: exportStub }, 'Export'));
+  const left = $('div', { class: 'left' },
+    $('div', { class: 'tabs' }, ['templates', 'photos'].map(t => $('button', { class: S.tab === t ? 'on' : '', onclick: () => { S.tab = t; render(); } }, t[0].toUpperCase() + t.slice(1)))),
+    S.tab === 'templates' ? templatePicker(180) : photoTray());
+  const center = $('div', { class: 'center' },
+    canvasHost(host => {
+      const n = S.slides, r = RATIOS[S.ratio], box = host.parentElement;
+      const sw = clamp(Math.min((box.clientWidth - 60) / n, (box.clientHeight - 160) / r), 170, 460);
+      return strip(sw);
+    }, { flex: 'none' }),
+    $('p', { class: 'muted', style: { marginTop: '28px', textAlign: 'center', maxWidth: '520px' } },
+      S.type === 'seamless' ? 'Seamless: the whole Post is one canvas. Dashed red lines are where it gets cut into Slides on export; cells may cross them.'
+        : S.type === 'carousel' ? 'Carousel: each Slide is laid out on its own; cells never cross the dashed Slide edges.' : 'Collage: one image.'));
+  const right = $('div', { class: 'right' }, $('h3', {}, 'Layout style'), styleControls(), $('h3', {}, 'Selected cell'), cellControls(),
+    $('h3', { style: { marginTop: '18px' } }, 'Size'), $('p', { class: 'muted' }, RINFO[S.ratio]));
+  root.append($('div', { class: 'ws' }, top, left, center, right));
+}
+
+// ---------- Variant C: slide focus + filmstrip ----------
+function variantC(root) {
+  const n = S.slides, r = RATIOS[S.ratio];
+  const top = $('div', { class: 'top' },
+    $('select', { onchange: e => { setType(e.target.value); render(); } }, Object.entries(TYPES).map(([k, t]) => $('option', { value: k, selected: S.type === k }, t.name))),
+    ratioSelect(), $('span', { style: { flex: 1 } }),
+    $('button', { class: S.drawer === 'templates' ? 'on' : '', onclick: () => { S.drawer = S.drawer === 'templates' ? null : 'templates'; render(); } }, 'Templates'),
+    $('button', { class: S.drawer === 'style' ? 'on' : '', onclick: () => { S.drawer = S.drawer === 'style' ? null : 'style'; render(); } }, 'Style'),
+    $('button', { onclick: openPreview }, 'Preview'), $('button', { class: 'primary', onclick: exportStub }, 'Export'));
+  const go = d => { S.cur = clamp(S.cur + d, 0, n - 1); render(); };
+  const stage = $('div', { class: 'stage' },
+    n > 1 ? $('button', { class: 'arrow', disabled: S.cur === 0, onclick: () => go(-1) }, '‹') : null,
+    canvasHost(host => {
+      const vpH = host.parentElement.clientHeight - 30, peek = n > 1 ? 1.7 : 1.05;
+      const sw = Math.min(vpH / r, (host.parentElement.clientWidth - 140) / peek), vpW = sw * peek;
+      host.style.width = vpW + 'px';
+      const inner = $('div', { class: 'inner', style: { transform: `translate(${vpW / 2 - (S.cur + .5) * sw}px,-50%)` } }, strip(sw, { focus: n > 1 ? S.cur : null, bounds: n > 1 }));
+      return $('div', { class: 'vp', style: { width: vpW + 'px' } }, inner);
+    }, { height: '100%' }),
+    n > 1 ? $('button', { class: 'arrow', disabled: S.cur === n - 1, onclick: () => go(1) }, '›') : null);
+  const film = canvasHost(() => {
+    const fw = 64, fh = fw * r;
+    return $('div', { class: 'film' }, R(n).map(i => $('div', { class: 'fs' + (i === S.cur ? ' on' : ''), style: { width: fw + 'px', height: fh + 'px' }, onclick: () => { S.cur = i; render(); } },
+      $('span', { class: 'n' }, i + 1), $('div', { style: { transform: `translateX(${-i * fw}px)` } }, strip(fw, { interactive: false, bounds: false })))),
+      S.type !== 'collage' ? [$('button', { onclick: () => { setSlides(n + 1); render(); }, disabled: n >= 20 }, '+ Slide'), $('button', { onclick: () => { setSlides(n - 1); render(); }, disabled: n <= 2 }, '− Slide')] : null);
+  });
+  const bottom = $('div', { class: 'bottom' },
+    $('div', { class: 'muted' }, n > 1 ? `Slide ${S.cur + 1} of ${n}. ${S.type === 'seamless' ? 'Neighbouring Slides peek in at the sides: cells crossing the edge continue there.' : ''}` : 'Collage'),
+    photoTray(true), film);
+  const drawer = S.drawer && $('div', { class: 'drawer' },
+    $('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '12px' } }, $('h3', {}, S.drawer === 'templates' ? 'Templates' : 'Style'), $('button', { onclick: () => { S.drawer = null; render(); } }, '✕')),
+    S.drawer === 'templates' ? templatePicker(200) : [styleControls(), $('h3', {}, 'Selected cell'), cellControls()]);
+  root.append($('div', { class: 'sf' }, top, stage, bottom, drawer));
+}
+
+// ---------- shell: variants, switcher, state ----------
+const VARIANTS = { A: ['Step-by-step wizard', variantA], B: ['Three-pane workspace', variantB], C: ['Slide focus + filmstrip', variantC] };
+const KEYS = Object.keys(VARIANTS);
+let painters = [];
+const app = document.getElementById('app');
+const current = () => { const v = new URLSearchParams(location.search).get('variant'); return KEYS.includes(v) ? v : 'A'; };
+function showState() {
+  const c = S.cells.map((c, i) => `  ${i + 1}: [${[c.x, c.y, c.w, c.h].map(v => +v.toFixed(2)).join(', ')}] ${c.photo || '—'}${c.photo ? ` @${c.fx.toFixed(0)}%,${c.fy.toFixed(0)}% ×${c.zoom.toFixed(2)}` : ''}`);
+  document.querySelector('#state pre').textContent =
+    `variant: ${current()}\ntype: ${S.type}\nratio: ${S.ratio}\nslides: ${S.slides}\ntemplate: ${S.template}\nstyle: gap ${S.gap}, radius ${S.radius}, border ${S.border} ${S.borderColor}, bg ${S.bg}\nselected: ${S.sel == null ? '—' : S.sel + 1}   picked photo: ${S.pick || '—'}\ncells:\n${c.join('\n')}`;
+}
+function paint() { painters.forEach(p => p()); showState(); }
+function render() {
+  painters = []; app.replaceChildren();
+  const v = current(); VARIANTS[v][1](app);
+  document.getElementById('vlabel').textContent = `${v} (${VARIANTS[v][0]})`;
+  paint();
+}
+function cycle(d) {
+  const i = (KEYS.indexOf(current()) + d + KEYS.length) % KEYS.length;
+  const u = new URL(location); u.searchParams.set('variant', KEYS[i]); history.replaceState(null, '', u); render();
+}
+document.getElementById('prev').onclick = () => cycle(-1);
+document.getElementById('next').onclick = () => cycle(1);
+addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select,[contenteditable]')) return;
+  if (e.key === 'ArrowLeft') cycle(-1); if (e.key === 'ArrowRight') cycle(1);
+});
+addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>
