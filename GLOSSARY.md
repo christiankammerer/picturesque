@@ -42,4 +42,7 @@ A piece of text placed freely in a Layout, drawn above the Cells; in a Seamless 
 ## Template
 A reusable starting point for a Post: a Layout plus its styling, without photos. Applying a Template copies it into the Post; later changes to the Template do not affect that Post. Built-in Templates adapt to any Slide count; Templates the user saves keep a fixed Slide count.
 
+## Style Preset
+A named set of Layout styling (gap, corner radius, border, background) that can be applied to any Layout in one click, independent of the Layout itself.
+
 _Avoid_: "slides" to mean the whole product output; say Carousel (the post) or Slide (one image of it).
