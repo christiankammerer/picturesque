@@ -28,10 +28,13 @@ The centred 3:4 portion of a Post's first image that Instagram's profile grid sh
 The arrangement of a Post's Elements on one continuous canvas, as wide as the Post's Slides side by side (a Collage is one Slide wide). In a Carousel no Cell crosses a Slide edge; in a Seamless Carousel Cells may. The user can adjust a Layout (resize, split, merge Cells) but it is not a free design surface.
 
 ## Element
-Anything placed in a Layout: a Cell or a Text Box.
+Anything placed in a Layout: a Cell, a Spacer or a Text Box.
 
 ## Cell
 A slot in a Layout that holds at most one photo, framed (cropped, panned, zoomed) within it.
+
+## Spacer
+An empty area of a Layout that shows the Post's background; lets a Layout leave room around Cells.
 
 ## Text Box
 A piece of text placed freely in a Layout, drawn above the Cells; in a Seamless Carousel it may cross Slide edges.
