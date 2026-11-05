@@ -16,7 +16,13 @@ One image within a Carousel. All Slides of a Carousel share the Post's Aspect Ra
 A Carousel designed as one continuous wide canvas that is cut into Slides at export, so content can span the boundary between adjacent Slides.
 
 ## Aspect Ratio
-The width-to-height proportion of a Post's images. Supported: 1:1 (square), 4:5 (portrait), 9:16 (story).
+The width-to-height proportion of a Post's images. Supported for every Post: 1:1 (square), 4:5 (portrait, the default) and 3:4 (tall portrait). 9:16 is allowed only for a Story.
+
+## Story
+A Collage at 9:16, made for Instagram Stories. Not a separate kind of Post; a Carousel is never a Story.
+
+## Grid Crop
+The centred 3:4 portion of a Post's first image that Instagram's profile grid shows. A 3:4 Post loses nothing to it.
 
 ## Layout
 The arrangement of photo cells within a Collage or Slide. A Template supplies a starting Layout.
