@@ -25,9 +25,18 @@ A Collage at 9:16, made for Instagram Stories. Not a separate kind of Post; a Ca
 The centred 3:4 portion of a Post's first image that Instagram's profile grid shows. A 3:4 Post loses nothing to it.
 
 ## Layout
-The arrangement of photo cells within a Collage or Slide. A Template supplies a starting Layout.
+The arrangement of a Post's Elements on one continuous canvas, as wide as the Post's Slides side by side (a Collage is one Slide wide). In a Carousel no Cell crosses a Slide edge; in a Seamless Carousel Cells may. The user can adjust a Layout (resize, split, merge Cells) but it is not a free design surface.
+
+## Element
+Anything placed in a Layout: a Cell or a Text Box.
+
+## Cell
+A slot in a Layout that holds at most one photo, framed (cropped, panned, zoomed) within it.
+
+## Text Box
+A piece of text placed freely in a Layout, drawn above the Cells; in a Seamless Carousel it may cross Slide edges.
 
 ## Template
-A reusable, pre-designed starting point for a Post — Layout plus styling — that the user fills with their own photos.
+A reusable starting point for a Post: a Layout plus its styling, without photos. Applying a Template copies it into the Post; later changes to the Template do not affect that Post. Built-in Templates adapt to any Slide count; Templates the user saves keep a fixed Slide count.
 
 _Avoid_: "slides" to mean the whole product output; say Carousel (the post) or Slide (one image of it).
