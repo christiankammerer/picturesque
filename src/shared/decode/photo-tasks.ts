@@ -15,7 +15,8 @@ export type PhotoTask =
 /** The input bytes come back with every result, so they are moved, never copied. */
 export type PhotoTaskResult =
   | { kind: 'inspect'; result: InspectResult; bytes: ArrayBuffer }
-  | { kind: 'decode'; bitmap: ImageBitmap; bytes: ArrayBuffer };
+  /** `thumbnail` is a small WebP for the Photos panel, made with preview copies only. */
+  | { kind: 'decode'; bitmap: ImageBitmap; bytes: ArrayBuffer; thumbnail?: Blob };
 
 export type PhotoPool = WorkerPool<PhotoTask, PhotoTaskResult>;
 

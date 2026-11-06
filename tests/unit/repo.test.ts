@@ -88,13 +88,15 @@ describe('OVR-05 i18n', () => {
   });
   it('every key the components use exists in the English catalogue', () => {
     const en = JSON.parse(readFileSync(join(root, 'src/renderer/src/i18n/locales/en.json'), 'utf8'));
-    const keys = files(join(root, 'src/renderer'), /\.tsx?$/).flatMap((f) =>
+    const keys = [...files(join(root, 'src/renderer'), /\.tsx?$/), ...files(join(root, 'src/main'), /\.ts$/)].flatMap((f) =>
       [...readFileSync(f, 'utf8').matchAll(/\bt\('([^']+)'/g)].map((m) => m[1]!),
     );
     expect(keys.length).toBeGreaterThan(0);
+    const lookup = (key: string) => key.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], en);
     for (const key of keys) {
-      const value = key.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], en);
-      expect(typeof value, key).toBe('string');
+      // A plural key exists as key_one and key_other.
+      const found = typeof lookup(key) === 'string' || (typeof lookup(`${key}_one`) === 'string' && typeof lookup(`${key}_other`) === 'string');
+      expect(found, key).toBe(true);
     }
   });
 });

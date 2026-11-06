@@ -5,3 +5,5 @@ release/
 coverage/
 tests/golden/__output__/
 *.tmp
+tests/e2e/__output__/
+tests/e2e/__report__/
