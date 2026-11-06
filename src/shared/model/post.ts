@@ -2,12 +2,12 @@
 //
 // Post-level rules: Aspect Ratios (MOD-04…MOD-07) and new Posts.
 
+import { BUILT_IN_TEMPLATES, postFromTemplate } from '../templates/builtins.ts';
 import { newCellId } from './layout-ops.ts';
 import {
   RATIO_HEIGHT,
   slideCountOf,
   type AspectRatio,
-  type Layout,
   type LayoutStyle,
   type Post,
   type PostType,
@@ -44,40 +44,29 @@ export const PLAIN_STYLE: LayoutStyle = {
 
 export type NewPostKind = 'collage' | 'story' | 'carousel' | 'seamless';
 
-/** A new, empty Post: one Cell per Slide, no Template. */
+/**
+ * EDT-03: a new Post opens with its type's first built-in Template, at the
+ * default Aspect Ratio (MOD-05), with 3 Slides for a Carousel (MOD-02).
+ */
 export function newPost(kind: NewPostKind): Post {
-  const cell = () => ({ kind: 'cell' as const, id: newCellId() });
-  let layout: Layout;
-  switch (kind) {
-    case 'collage':
-    case 'story':
-      layout = { postType: 'collage', root: cell() };
-      break;
-    case 'carousel':
-      layout = { postType: 'carousel', slides: Array.from({ length: NEW_CAROUSEL_SLIDES }, cell) };
-      break;
-    case 'seamless': {
-      const n = NEW_CAROUSEL_SLIDES;
-      layout = {
+  if (kind === 'seamless') {
+    // Seamless Templates arrive in M4; until then a row of one Cell per Slide.
+    const n = NEW_CAROUSEL_SLIDES;
+    const cell = () => ({ kind: 'cell' as const, id: newCellId() });
+    return {
+      type: 'seamless',
+      aspectRatio: DEFAULT_ASPECT_RATIO,
+      layout: {
         postType: 'seamless',
         slideCount: n,
-        root: {
-          kind: 'split',
-          direction: 'row',
-          sizes: Array.from({ length: n }, () => 1 / n),
-          children: Array.from({ length: n }, cell),
-        },
-      };
-      break;
-    }
+        root: { kind: 'split', direction: 'row', sizes: Array.from({ length: n }, () => 1 / n), children: Array.from({ length: n }, cell) },
+      },
+      style: { ...PLAIN_STYLE },
+      textBoxes: [],
+    };
   }
-  return {
-    type: layout.postType,
-    aspectRatio: kind === 'story' ? STORY_ASPECT_RATIO : DEFAULT_ASPECT_RATIO,
-    layout,
-    style: { ...PLAIN_STYLE },
-    textBoxes: [],
-  };
+  const first = BUILT_IN_TEMPLATES.find((t) => t.kind === kind)!;
+  return postFromTemplate(first, kind === 'story' ? STORY_ASPECT_RATIO : DEFAULT_ASPECT_RATIO, NEW_CAROUSEL_SLIDES);
 }
 
 /**

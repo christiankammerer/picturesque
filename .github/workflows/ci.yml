@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# DST-09: every pull request runs lint, type-check, unit tests and browser
-# tests (golden images, decoding, export) on Windows, macOS and Linux.
-# End-to-end tests and the benchmark smoke join this workflow later.
+# DST-09: every pull request runs lint, type-check, unit tests, browser
+# tests (golden images, decoding, export) and end-to-end tests of the built
+# app on Windows, macOS and Linux. The benchmark smoke joins later (M8).
 
 name: CI
 
@@ -64,6 +64,22 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: End-to-end tests (Linux, under a virtual display)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e
+
+      - name: End-to-end tests
+        if: runner.os != 'Linux'
+        run: npm run test:e2e
+
+      - name: Upload end-to-end traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces-${{ matrix.os }}
+          path: tests/e2e/__output__/
+          if-no-files-found: ignore
 
       - name: Headless export smoke (M1 demo)
         run: npm run demo

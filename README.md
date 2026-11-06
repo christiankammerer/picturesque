@@ -16,6 +16,7 @@ npm run dev            # run the app
 npm run lint
 npm run typecheck
 npm test               # unit tests, then browser tests (golden images, decoding, export)
+npm run build && npm run test:e2e   # end-to-end tests of the built app (Playwright + Electron)
 npm run demo           # export fixtures/trip/post.json to out/demo/trip.jpg
 ```
 

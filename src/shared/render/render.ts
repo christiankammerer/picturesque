@@ -258,3 +258,10 @@ function resetState(ctx: RenderContext): void {
 function clampInt(v: number, lo: number, hi: number): number {
   return Math.min(Math.max(Math.trunc(v), lo), hi);
 }
+
+/** A Cell's inner rectangle (RND-06) at a scale, or undefined if there is no such Cell. */
+export function cellInnerRect(post: Post, cellId: string, scale: number): PxRect | undefined {
+  const yScale = scale * RATIO_HEIGHT[post.aspectRatio];
+  const leaf = leafRects(post.layout).find((l) => l.node.kind === 'cell' && l.node.id === cellId);
+  return leaf ? innerRect(leaf, scale, yScale, post.style.gap * scale) : undefined;
+}

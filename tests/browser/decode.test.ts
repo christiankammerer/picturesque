@@ -164,3 +164,24 @@ describe('EXP-04 export decodes HEIC originals', () => {
     expect(corners(bmp)).toEqual(['yellow', 'blue', 'green', 'red']);
   });
 });
+
+describe('Photos-panel thumbnails', () => {
+  it('are upright square crops of the preview copy, for every format', async () => {
+    const pool = createPhotoPool(2);
+    const got: ImportedPhoto[] = [];
+    const sources: ImportSource[] = await Promise.all(
+      Object.entries(FIXTURES).map(async ([name, url]) => {
+        const bytes = await bytesOf(url);
+        return { name, lastModified: 0, read: async () => bytes.slice().buffer };
+      }),
+    );
+    await importPhotos(sources, new Set(), pool, (p) => got.push(p));
+    pool.terminate();
+    for (const p of got) {
+      const thumb = await createImageBitmap(p.thumbnail);
+      expect([thumb.width, thumb.height]).toEqual([256, 256]);
+      // The centre crop still shows the four quadrants the same way round.
+      expect(corners(thumb), p.meta.originalName).toEqual(corners(p.preview));
+    }
+  });
+});

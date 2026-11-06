@@ -13,6 +13,6 @@
     "src/shared/**/*",
     "src/headless/**/*",
     "scripts/**/*",
-    "tests/unit/**/*", "tests/helpers/**/*"
+    "tests/unit/**/*", "tests/helpers/**/*", "tests/e2e/**/*", "playwright.config.ts"
   ]
 }

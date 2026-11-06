@@ -1,7 +1,78 @@
 {
   "app": {
     "name": "Picturesque",
-    "comingSoon": "The editor is on its way."
+    "untitled": "Untitled",
+    "windowTitle": "{{name}}{{mark}} — Picturesque",
+    "unsavedMark": " •"
+  },
+  "start": {
+    "newCollage": "New Collage",
+    "collageHint": "One image from several photos",
+    "newCarousel": "New Carousel",
+    "carouselHint": "Up to 20 Slides to swipe through",
+    "newStory": "New Story",
+    "storyHint": "A 9:16 Collage for Stories",
+    "open": "Open…",
+    "openLater": "Opening Projects comes in a later version"
+  },
+  "sidebar": {
+    "label": "Templates and photos",
+    "templates": "Templates",
+    "photos": "Photos",
+    "templatesLater": "Templates come in the next update."
+  },
+  "photos": {
+    "dropZone": "Add photos (or drop them here)",
+    "choose": "Choose photos…",
+    "add": "Add photos…",
+    "importing_one": "Importing {{count}} photo…",
+    "importing_other": "Importing {{count}} photos…",
+    "placed_one": "Placed in {{count}} Cell",
+    "placed_other": "Placed in {{count}} Cells",
+    "uses": "×{{count}}",
+    "placedMark": "✓"
+  },
+  "canvas": {
+    "label": "Post canvas",
+    "emptyCell": "Empty Cell",
+    "filledCell": "Cell with a photo"
+  },
+  "inspector": {
+    "label": "Inspector",
+    "nothingSelected": "Select a Cell to frame its photo.",
+    "cell": "Cell",
+    "emptyCellHint": "Drag a photo here, or click a photo and then this Cell.",
+    "zoom": "Zoom",
+    "straighten": "Straighten",
+    "degrees": "{{value}}°",
+    "rotate": "Rotate 90°",
+    "resetFraming": "Reset framing",
+    "emptyCell": "Empty Cell"
+  },
+  "topBar": {
+    "aspectRatio": "Aspect ratio",
+    "export": "Export",
+    "exporting": "Exporting {{done}}/{{total}}…"
+  },
+  "ratio": {
+    "1x1": "1:1 Square",
+    "4x5": "4:5 Portrait",
+    "3x4": "3:4 Tall",
+    "9x16": "9:16 Story"
+  },
+  "templates": {
+    "singleFramed": "Single framed",
+    "sideBySide": "Side by side",
+    "threeColumns": "Three columns",
+    "grid2x2": "Grid 2×2",
+    "grid3x3": "Grid 3×3",
+    "hero2": "Hero + 2",
+    "hero3": "Hero + 3",
+    "mosaic": "Mosaic",
+    "twoStacked": "Two stacked",
+    "photoStrip": "Photo strip",
+    "caption": "Caption",
+    "onePerSlide": "One per Slide"
   },
   "import": {
     "unsupported": "{{name}} isn't a supported photo. Picturesque opens JPEG, PNG, WebP and HEIC.",
@@ -9,5 +80,42 @@
     "unreadable": "{{name}} couldn't be read.",
     "overLimit_one": "Projects can hold up to 100 photos. {{count}} wasn't added.",
     "overLimit_other": "Projects can hold up to 100 photos. {{count}} weren't added."
+  },
+  "export": {
+    "chooseFolder": "Export to folder",
+    "done_one": "{{count}} image exported",
+    "done_other": "{{count}} images exported",
+    "failed": "Export failed: {{message}}"
+  },
+  "notice": {
+    "dismiss": "Dismiss",
+    "close": "×"
+  },
+  "menu": {
+    "file": "File",
+    "new": "New",
+    "open": "Open…",
+    "openRecent": "Open Recent",
+    "save": "Save",
+    "saveAs": "Save As…",
+    "saveAsTemplate": "Save as Template…",
+    "export": "Export…",
+    "quit": "Quit Picturesque",
+    "edit": "Edit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "view": "View",
+    "gridCrop": "Grid Crop",
+    "previewAsPost": "Preview as post",
+    "help": "Help",
+    "shortcuts": "Keyboard shortcuts",
+    "phoneHelp": "How to get exports onto your phone",
+    "about": "About Picturesque",
+    "licences": "Third-party licences",
+    "settings": "Settings…"
   }
 }

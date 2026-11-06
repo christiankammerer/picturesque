@@ -50,32 +50,95 @@ const DEG = Math.PI / 180;
  * photo exactly when its centre is at least ex, ey from every photo edge.
  */
 export function placePhoto(rect: PxRect, bitmapW: number, bitmapH: number, framing: Framing): Placement {
-  const quarter = framing.rotate90;
-  const swap = quarter === 90 || quarter === 270;
+  const g = coverGeometry(rect, bitmapW, bitmapH, framing);
+  const cx = clamp(framing.focusX * g.pw, g.ex, g.pw - g.ex);
+  const cy = clamp(framing.focusY * g.ph, g.ey, g.ph - g.ey);
+
+  // Compose: canvas = T(rect centre) · R(straighten) · T(-cx, -cy) · Q(quarter) · S(k)
+  let m: Affine = translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
+  m = multiply(m, rotate(g.s));
+  m = multiply(m, translate(-cx, -cy));
+  m = multiply(m, quarterTurn(framing.rotate90, g.pw, g.ph));
+  m = multiply(m, { a: g.k, b: 0, c: 0, d: g.k, e: 0, f: 0 });
+  return { transform: m, scale: g.k, drawnWidth: bitmapW * g.k, drawnHeight: bitmapH * g.k };
+}
+
+interface CoverGeometry {
+  /** Straighten angle, radians. */
+  s: number;
+  /** Half-extents of the tilted rectangle in the photo's frame, px. */
+  ex: number;
+  ey: number;
+  /** Scale from bitmap px to canvas px. */
+  k: number;
+  /** Size of the rotated photo, canvas px. */
+  pw: number;
+  ph: number;
+}
+
+function coverGeometry(rect: PxRect, bitmapW: number, bitmapH: number, framing: Framing): CoverGeometry {
+  const swap = framing.rotate90 === 90 || framing.rotate90 === 270;
   const rw = swap ? bitmapH : bitmapW; // rotated photo size, bitmap px
   const rh = swap ? bitmapW : bitmapH;
-
   const s = framing.straighten * DEG;
   const cos = Math.abs(Math.cos(s));
   const sin = Math.abs(Math.sin(s));
   const ex = (rect.w * cos + rect.h * sin) / 2;
   const ey = (rect.w * sin + rect.h * cos) / 2;
+  const k = Math.max((2 * ex) / rw, (2 * ey) / rh) * framing.zoom;
+  return { s, ex, ey, k, pw: rw * k, ph: rh * k };
+}
 
-  const cover = Math.max((2 * ex) / rw, (2 * ey) / rh);
-  const k = cover * framing.zoom;
-  const pw = rw * k; // rotated photo size, canvas px
-  const ph = rh * k;
+/** The framing with its focus clamped to what keeps the Cell covered, so the
+ *  stored focus matches what is shown (pans never feel stuck). */
+export function clampFocus(rect: PxRect, bitmapW: number, bitmapH: number, framing: Framing): Framing {
+  const g = coverGeometry(rect, bitmapW, bitmapH, framing);
+  return {
+    ...framing,
+    focusX: clamp(framing.focusX, g.ex / g.pw, 1 - g.ex / g.pw),
+    focusY: clamp(framing.focusY, g.ey / g.ph, 1 - g.ey / g.ph),
+  };
+}
 
-  const cx = clamp(framing.focusX * pw, ex, pw - ex);
-  const cy = clamp(framing.focusY * ph, ey, ph - ey);
+/** EDT-15: pan by a pointer delta (canvas px). The photo follows the pointer. */
+export function panFraming(rect: PxRect, bitmapW: number, bitmapH: number, framing: Framing, dx: number, dy: number): Framing {
+  const g = coverGeometry(rect, bitmapW, bitmapH, framing);
+  const [ux, uy] = unrotate(g.s, dx, dy);
+  const start = clampFocus(rect, bitmapW, bitmapH, framing);
+  return clampFocus(rect, bitmapW, bitmapH, { ...framing, focusX: start.focusX - ux / g.pw, focusY: start.focusY - uy / g.ph });
+}
 
-  // Compose: canvas = T(rect centre) · R(straighten) · T(-cx, -cy) · Q(quarter) · S(k)
-  let m: Affine = translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
-  m = multiply(m, rotate(s));
-  m = multiply(m, translate(-cx, -cy));
-  m = multiply(m, quarterTurn(quarter, pw, ph));
-  m = multiply(m, { a: k, b: 0, c: 0, d: k, e: 0, f: 0 });
-  return { transform: m, scale: k, drawnWidth: bitmapW * k, drawnHeight: bitmapH * k };
+export const MIN_ZOOM = 1;
+export const MAX_ZOOM = 10;
+
+/** EDT-15: zoom by `factor` around a point (canvas px), keeping the photo point under it in place. */
+export function zoomFramingAt(
+  rect: PxRect,
+  bitmapW: number,
+  bitmapH: number,
+  framing: Framing,
+  factor: number,
+  px: number,
+  py: number,
+): Framing {
+  const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, framing.zoom * factor));
+  const start = clampFocus(rect, bitmapW, bitmapH, framing);
+  const before = coverGeometry(rect, bitmapW, bitmapH, start);
+  const after = coverGeometry(rect, bitmapW, bitmapH, { ...start, zoom });
+  const [ux, uy] = unrotate(before.s, px - (rect.x + rect.w / 2), py - (rect.y + rect.h / 2));
+  return clampFocus(rect, bitmapW, bitmapH, {
+    ...start,
+    zoom,
+    focusX: start.focusX + ux * (1 / before.pw - 1 / after.pw),
+    focusY: start.focusY + uy * (1 / before.ph - 1 / after.ph),
+  });
+}
+
+/** A canvas-space vector in the photo's (straightened) frame. */
+function unrotate(s: number, x: number, y: number): [number, number] {
+  const c = Math.cos(s);
+  const n = Math.sin(s);
+  return [c * x + n * y, -n * x + c * y];
 }
 
 /** Q: maps the scaled, unrotated photo into the rotated photo's frame [0,pw]×[0,ph]. */

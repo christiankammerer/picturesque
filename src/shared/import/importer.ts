@@ -28,6 +28,8 @@ export interface ImportedPhoto {
   meta: PhotoMeta;
   /** PRF-01: the 2048 px preview copy. The original is never decoded at full size here. */
   preview: ImageBitmap;
+  /** A small WebP for the Photos panel. */
+  thumbnail: Blob;
   /** The original file's bytes, unchanged (PRJ-02). */
   bytes: Uint8Array<ArrayBuffer>;
 }
@@ -92,7 +94,7 @@ export async function importPhotos(
         .run(() => ({ payload: { kind: 'decode', bytes, format: meta.ext, width: meta.width, height: meta.height }, transfer: [bytes] }), 'high')
         .then((r) => {
           if (r.kind !== 'decode') throw new Error('unexpected worker reply');
-          onPhoto({ meta, preview: r.bitmap, bytes: new Uint8Array(r.bytes) });
+          onPhoto({ meta, preview: r.bitmap, thumbnail: r.thumbnail ?? new Blob(), bytes: new Uint8Array(r.bytes) });
         }),
     );
   }
