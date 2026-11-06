@@ -17,18 +17,19 @@
     "start": "electron-vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
-    "test": "npm run test:unit && npm run test:golden",
+    "test": "npm run test:unit && npm run test:browser",
     "test:unit": "vitest run --project unit",
-    "test:golden": "vitest run --project golden",
-    "test:golden:update": "UPDATE_GOLDEN=1 vitest run --project golden",
     "export:headless": "node scripts/export-headless.ts",
     "demo": "node scripts/export-headless.ts fixtures/trip/post.json out/demo",
     "check:milestones": "node scripts/check-milestones.ts",
-    "fixtures:trip": "node scripts/make-trip-fixture.ts"
+    "fixtures:trip": "node scripts/make-trip-fixture.ts",
+    "test:browser": "vitest run --project browser",
+    "test:golden:update": "UPDATE_GOLDEN=1 vitest run --project browser tests/golden"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
     "i18next": "^26.7.2",
+    "libheif-js": "^1.23.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-i18next": "^17.1.13",

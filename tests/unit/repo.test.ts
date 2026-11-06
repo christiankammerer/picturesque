@@ -4,7 +4,10 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { ESLint } from 'eslint';
+import { build } from 'vite';
 import { describe, expect, it } from 'vitest';
 import { checkMilestones } from '../../scripts/check-milestones.ts';
 
@@ -102,4 +105,25 @@ describe('milestone coverage (10-milestones.md)', () => {
     expect(defined.length).toBeGreaterThan(100);
     expect(problems).toEqual([]);
   });
+});
+
+describe('OVR-10 libheif ships as a separate WASM file', () => {
+  it('a build of the photo pipeline emits libheif as its own .wasm asset', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'picturesque-build-'));
+    try {
+      await build({
+        configFile: false,
+        root,
+        logLevel: 'silent',
+        build: { outDir, emptyOutDir: true, rollupOptions: { input: join(root, 'src/shared/decode/photo-tasks.ts') } },
+      });
+      const out = files(outDir, /./).map((f) => relative(outDir, f));
+      const wasm = out.filter((f) => /libheif.*\.wasm$/.test(f));
+      expect(wasm).toHaveLength(1);
+      expect(statSync(join(outDir, wasm[0]!)).size).toBeGreaterThan(1_000_000);
+      expect(out.some((f) => /photo-worker.*\.js$/.test(f))).toBe(true);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

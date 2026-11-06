@@ -10,12 +10,12 @@ Requires Node.js 22.18 or later (scripts run TypeScript directly).
 
 ```sh
 npm install
-npx playwright install chromium   # headless Chromium for golden tests and headless export
+npx playwright install chromium   # headless Chromium for browser tests and headless export
 
 npm run dev            # run the app
 npm run lint
 npm run typecheck
-npm test               # unit tests, then golden-image tests
+npm test               # unit tests, then browser tests (golden images, decoding, export)
 npm run demo           # export fixtures/trip/post.json to out/demo/trip.jpg
 ```
 
@@ -26,6 +26,10 @@ node scripts/export-headless.ts <post.json> <out-dir> [--photos <dir>]
 ```
 
 `post.json` is a Project file (`docs/spec/schema.ts`). Photos are found as `<photos>/<sha256>.<ext>`, or by their original name; `<photos>` defaults to the `photos` folder next to `post.json`.
+
+### Test fixtures
+
+The synthetic photos in `tests/fixtures/photos/` (HEIC, and small JPEG, PNG and WebP files with EXIF orientation) come from `scripts/make-heic-fixtures.py`, which needs `pip install pillow pillow-heif`. The trip demo's photos come from `npm run fixtures:trip`.
 
 ### Golden-image tests
 

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# DST-09: every pull request runs lint, type-check, unit and golden-image
-# tests on Windows, macOS and Linux. End-to-end tests and the benchmark smoke
-# join this workflow in later milestones.
+# DST-09: every pull request runs lint, type-check, unit tests and browser
+# tests (golden images, decoding, export) on Windows, macOS and Linux.
+# End-to-end tests and the benchmark smoke join this workflow later.
 
 name: CI
 
@@ -48,8 +48,8 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
-      - name: Golden-image tests
-        run: npm run test:golden
+      - name: Browser tests (golden images, decoding, export)
+        run: npm run test:browser
 
       - name: Upload golden-image diffs
         if: failure()

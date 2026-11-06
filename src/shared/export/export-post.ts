@@ -5,6 +5,7 @@
 // (PRF-06), or a headless Chromium page for scripts and tests. Writing the
 // files is the caller's job (see src/main/export/write-files.ts).
 
+import { decodePhoto } from '../decode/decode.ts';
 import { canvasPixelSize } from '../model/post.ts';
 import { slideCountOf, type PhotoMeta, type Post } from '../model/schema.ts';
 import { render, type PhotoSource } from '../render/render.ts';
@@ -63,11 +64,12 @@ export async function exportPost(input: ExportInput): Promise<ExportedSlide[]> {
       const blob = await input.readPhoto(photoId);
       const meta = input.photos[photoId]!;
       const resize = size.width < meta.width || size.height < meta.height;
-      const bitmap = await createImageBitmap(blob, {
-        imageOrientation: 'from-image',
-        colorSpaceConversion: 'default',
-        ...(resize ? { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'high' as const } : {}),
-      });
+      // Originals are decoded one at a time, and each full-size decode is
+      // dropped as soon as its Cell-sized bitmap exists. The Cell-sized
+      // bitmaps are then held together for the single render (EXP-03), which
+      // is a looser reading of PRF-02's "draws it, and frees it before
+      // decoding the next".
+      const bitmap = await decodePhoto(new Uint8Array(await blob.arrayBuffer()), meta.ext, resize ? size : undefined);
       bitmaps.set(photoId, bitmap);
     }
     check();
