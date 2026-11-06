@@ -7,6 +7,9 @@
 import factory, { type Libheif } from 'libheif-js/libheif-wasm/libheif.js';
 import wasmUrl from 'libheif-js/libheif-wasm/libheif.wasm?url';
 
+import { readHeader } from '../import/formats.ts';
+import { heicColourSpace } from './colour.ts';
+
 let lib: Promise<Libheif> | undefined;
 
 function libheif(): Promise<Libheif> {
@@ -23,6 +26,13 @@ function libheif(): Promise<Libheif> {
  * the file's irot and imir transforms, so the result is upright.
  */
 export async function decodeHeic(bytes: Uint8Array): Promise<ImageData> {
+  // The pixels are in the photo's own colour space; tag them so Chromium converts them.
+  let colorSpace: PredefinedColorSpace = 'srgb';
+  try {
+    colorSpace = heicColourSpace(readHeader(bytes, 'heic'));
+  } catch {
+    // A header libheif can read but we can't: assume sRGB.
+  }
   const heif = await libheif();
   const images = new heif.HeifDecoder().decode(bytes);
   try {
@@ -35,7 +45,7 @@ export async function decodeHeic(bytes: Uint8Array): Promise<ImageData> {
       image.display({ data, width, height }, resolve),
     );
     if (!result) throw new Error('HEIC decoding failed');
-    return new ImageData(data, width, height);
+    return new ImageData(data, width, height, { colorSpace });
   } finally {
     for (const i of images) i.free();
   }

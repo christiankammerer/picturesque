@@ -16,6 +16,7 @@ export function startNew(kind: NewPostKind): void {
     project: emptyProject(newPost(kind)),
     dirty: false,
     selectedCell: null,
+    selectedSpacer: null,
     armedPhoto: null,
     sidebarTab: 'photos', // EDT-03
     notices: [],

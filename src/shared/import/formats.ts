@@ -52,6 +52,8 @@ export interface HeaderInfo {
   /** HEIC only: the primary image's irot (quarter turns, anti-clockwise) and imir. */
   heifRotation?: 0 | 1 | 2 | 3;
   heifMirror?: boolean;
+  /** HEIC only: the primary image's colr property. */
+  heifColour?: { type: 'nclx'; primaries: number; transfer: number } | { type: 'icc'; profile: Uint8Array };
 }
 
 /** Reads the pixel size and EXIF block from a photo's header. Throws on a malformed file. */
@@ -232,6 +234,10 @@ function readHeif(b: Uint8Array): HeaderInfo {
       info.heifRotation = (b[p.start]! & 3) as 0 | 1 | 2 | 3;
     } else if (p.type === 'imir') {
       info.heifMirror = true;
+    } else if (p.type === 'colr' && !info.heifColour) {
+      const kind = ascii(b, p.start, 4);
+      if (kind === 'nclx') info.heifColour = { type: 'nclx', primaries: u16be(b, p.start + 4), transfer: u16be(b, p.start + 6) };
+      else if (kind === 'prof' || kind === 'rICC') info.heifColour = { type: 'icc', profile: b.subarray(p.start + 4, p.end) };
     }
   }
   if (!info.width || !info.height) throw new Error('HEIF primary image has no size');

@@ -18,8 +18,7 @@
   "sidebar": {
     "label": "Templates and photos",
     "templates": "Templates",
-    "photos": "Photos",
-    "templatesLater": "Templates come in the next update."
+    "photos": "Photos"
   },
   "photos": {
     "dropZone": "Add photos (or drop them here)",
@@ -35,11 +34,13 @@
   "canvas": {
     "label": "Post canvas",
     "emptyCell": "Empty Cell",
-    "filledCell": "Cell with a photo"
+    "filledCell": "Cell with a photo",
+    "spacer": "Spacer",
+    "divider": "Divider"
   },
   "inspector": {
     "label": "Inspector",
-    "nothingSelected": "Select a Cell to frame its photo.",
+    "nothingSelected": "Select a Cell to frame its photo or change the Layout.",
     "cell": "Cell",
     "emptyCellHint": "Drag a photo here, or click a photo and then this Cell.",
     "zoom": "Zoom",
@@ -47,7 +48,39 @@
     "degrees": "{{value}}°",
     "rotate": "Rotate 90°",
     "resetFraming": "Reset framing",
-    "emptyCell": "Empty Cell"
+    "emptyCell": "Empty Cell",
+    "spacer": "Spacer",
+    "makeCell": "Make Cell",
+    "layout": "Layout",
+    "split": {
+      "row": "Split side by side",
+      "column": "Split top and bottom"
+    },
+    "merge": "Merge with",
+    "mergeSide": {
+      "left": "Left",
+      "right": "Right",
+      "up": "Above",
+      "down": "Below"
+    },
+    "makeSpacer": "Make Spacer"
+  },
+  "style": {
+    "title": "Layout style",
+    "presets": "Style Presets",
+    "gap": "Gap",
+    "cornerRadius": "Corner radius",
+    "borderWidth": "Border width",
+    "borderColor": "Border",
+    "background": "Background"
+  },
+  "presets": {
+    "none": "None",
+    "clean": "Clean",
+    "gallery": "Gallery",
+    "black-frame": "Black frame",
+    "soft": "Soft",
+    "film": "Film"
   },
   "topBar": {
     "aspectRatio": "Aspect ratio",
@@ -72,7 +105,17 @@
     "twoStacked": "Two stacked",
     "photoStrip": "Photo strip",
     "caption": "Caption",
-    "onePerSlide": "One per Slide"
+    "onePerSlide": "One per Slide",
+    "none": "Templates for this kind of Post arrive in a later version.",
+    "section": {
+      "story": "Story",
+      "collage": "Collage",
+      "carousel": "Carousel",
+      "seamless": "Seamless"
+    },
+    "photoCount_one": "{{count}} photo",
+    "photoCount_other": "{{count}} photos",
+    "withText": "{{count}} · Aa"
   },
   "import": {
     "unsupported": "{{name}} isn't a supported photo. Picturesque opens JPEG, PNG, WebP and HEIC.",

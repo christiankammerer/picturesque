@@ -10,6 +10,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { leafRects } from '../../../shared/model/geometry.ts';
+import { dividers, moveDivider, type Divider } from '../../../shared/model/layout-ops.ts';
 import { emptyCell, findCell, placePhoto, setFraming } from '../../../shared/model/project.ts';
 import { RATIO_HEIGHT, slideCountOf, type Framing } from '../../../shared/model/schema.ts';
 import { panFraming, zoomFramingAt, type PxRect } from '../../../shared/render/framing.ts';
@@ -27,6 +28,7 @@ export function Canvas() {
   const post = useEditor((s) => s.project?.post);
   const photoVersion = useEditor((s) => s.photoVersion);
   const selectedCell = useEditor((s) => s.selectedCell);
+  const selectedSpacer = useEditor((s) => s.selectedSpacer);
   const drag = useEditor((s) => s.drag);
   const pane = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -67,7 +69,7 @@ export function Canvas() {
   if (!post || !geometry) return <div ref={pane} className="canvas-pane" />;
 
   return (
-    <div ref={pane} className="canvas-pane" onPointerDown={(e) => e.target === e.currentTarget && setState({ selectedCell: null })}>
+    <div ref={pane} className="canvas-pane" onPointerDown={(e) => e.target === e.currentTarget && setState({ selectedCell: null, selectedSpacer: null })}>
       <div className="canvas-stage" style={{ width: geometry.width, height: geometry.height }}>
         <canvas ref={canvas} className="canvas-render" style={{ width: geometry.width, height: geometry.height }} aria-label={t('canvas.label')} />
         {Array.from({ length: geometry.n - 1 }, (_, i) => (
@@ -84,9 +86,22 @@ export function Canvas() {
               dropHover={drag !== null && dropTargetAt(drag.x, drag.y)?.kind === 'cell' && (dropTargetAt(drag.x, drag.y) as { cellId: string }).cellId === leaf.node.id}
             />
           ) : (
-            <div key={`spacer-${i}`} className="spacer-overlay" style={boxStyle(rect)} />
+            <div
+              key={`spacer-${i}`}
+              className={`spacer-overlay${samePath(selectedSpacer, leaf.path) ? ' selected' : ''}`}
+              style={boxStyle(rect)}
+              data-testid="spacer"
+              aria-label={t('canvas.spacer')}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setState({ selectedCell: null, selectedSpacer: leaf.path });
+              }}
+            />
           ),
         )}
+        {dividers(post.layout).map((d) => (
+          <DividerHandle key={`${d.path.join('.')}:${d.index}`} divider={d} scale={geometry.scale} ratio={geometry.ratio} />
+        ))}
       </div>
     </div>
   );
@@ -142,7 +157,7 @@ function CellOverlay({ cellId, photoId, rect, selected, dropHover }: CellProps) 
       setState({ selectedCell: cellId, armedPhoto: null });
       return;
     }
-    setState({ selectedCell: cellId });
+    setState({ selectedCell: cellId, selectedSpacer: null });
     const cell = currentCell(cellId);
     if (!cell?.photo) return;
     const bitmap = preview(cell.photo.photoId);
@@ -197,4 +212,57 @@ function CellOverlay({ cellId, photoId, rect, selected, dropHover }: CellProps) 
 function currentCell(cellId: string) {
   const post = getState().project?.post;
   return post ? findCell(post.layout, cellId) : undefined;
+}
+
+function samePath(a: readonly number[] | null, b: readonly number[]): boolean {
+  return a !== null && a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/** EDT-16: a divider between neighbouring Elements, with a handle on hover. */
+function DividerHandle({ divider, scale, ratio }: { divider: Divider; scale: number; ratio: number }) {
+  const { t } = useTranslation();
+  const row = divider.direction === 'row';
+  const { rect } = divider;
+  const HIT = 8;
+  const style = row
+    ? { left: divider.at * scale - HIT / 2, top: rect.y0 * scale * ratio, width: HIT, height: (rect.y1 - rect.y0) * scale * ratio }
+    : { left: rect.x0 * scale, top: divider.at * scale * ratio - HIT / 2, width: (rect.x1 - rect.x0) * scale, height: HIT };
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    const node = e.currentTarget;
+    node.setPointerCapture(e.pointerId);
+    const stage = node.parentElement!.getBoundingClientRect();
+    const move = (ev: PointerEvent) => {
+      // The pointer's position as a fraction of the split's extent.
+      const position = row
+        ? ((ev.clientX - stage.left) / scale - rect.x0) / (rect.x1 - rect.x0)
+        : ((ev.clientY - stage.top) / (scale * ratio) - rect.y0) / (rect.y1 - rect.y0);
+      editProject((p) => {
+        const layout = moveDivider(p.post.layout, divider.path, divider.index, position);
+        return layout === p.post.layout ? p : { ...p, post: { ...p.post, layout } };
+      });
+    };
+    const end = () => {
+      node.removeEventListener('pointermove', move);
+      node.removeEventListener('pointerup', end);
+      node.removeEventListener('pointercancel', end);
+    };
+    node.addEventListener('pointermove', move);
+    node.addEventListener('pointerup', end);
+    node.addEventListener('pointercancel', end);
+  };
+
+  return (
+    <div
+      className={`divider ${row ? 'vertical' : 'horizontal'}`}
+      style={style}
+      data-testid="divider"
+      role="separator"
+      aria-orientation={row ? 'vertical' : 'horizontal'}
+      aria-label={t('canvas.divider')}
+      onPointerDown={onPointerDown}
+    />
+  );
 }
