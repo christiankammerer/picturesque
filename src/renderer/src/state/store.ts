@@ -23,6 +23,8 @@ export interface EditorState {
   /** EDT-31: unsaved changes. */
   dirty: boolean;
   selectedCell: string | null;
+  /** A selected Spacer, by its path in the tree (Spacers have no id). */
+  selectedSpacer: number[] | null;
   /** EDT-13: a panel photo clicked, waiting for a click on a Cell. */
   armedPhoto: string | null;
   sidebarTab: 'templates' | 'photos';
@@ -39,6 +41,7 @@ const initial: EditorState = {
   project: null,
   dirty: false,
   selectedCell: null,
+  selectedSpacer: null,
   armedPhoto: null,
   sidebarTab: 'photos',
   photoVersion: 0,

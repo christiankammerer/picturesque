@@ -12,6 +12,7 @@ import { Canvas } from './Canvas.tsx';
 import { Inspector } from './Inspector.tsx';
 import { Notices } from './Notices.tsx';
 import { PhotosPanel } from './PhotosPanel.tsx';
+import { TemplatesPanel } from './TemplatesPanel.tsx';
 import { TopBar } from './TopBar.tsx';
 
 const SIDEBAR_TABS = ['templates', 'photos'] as const;
@@ -50,7 +51,7 @@ export function Workspace() {
             </button>
           ))}
         </div>
-        {tab === 'photos' ? <PhotosPanel /> : <p className="muted pad">{t('sidebar.templatesLater')}</p>}
+        {tab === 'photos' ? <PhotosPanel /> : <TemplatesPanel />}
       </nav>
       <Canvas />
       <Inspector />

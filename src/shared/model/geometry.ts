@@ -33,6 +33,8 @@ export interface LeafRect {
   outer: OuterEdges;
   /** Carousel only: the Slide whose subtree holds the leaf. */
   slide: number | null;
+  /** Child indices from the root (for a Carousel, starting with the Slide). */
+  path: number[];
 }
 
 const ALL_OUTER: OuterEdges = { left: true, top: true, right: true, bottom: true };
@@ -49,15 +51,15 @@ export function leafRects(layout: Layout): LeafRect[] {
   const out: LeafRect[] = [];
   switch (layout.postType) {
     case 'collage':
-      walk(layout.root, { x0: 0, y0: 0, x1: 1, y1: 1 }, ALL_OUTER, null, out);
+      walk(layout.root, { x0: 0, y0: 0, x1: 1, y1: 1 }, ALL_OUTER, null, [], out);
       break;
     case 'carousel':
       layout.slides.forEach((slide, i) =>
-        walk(slide, { x0: i, y0: 0, x1: i + 1, y1: 1 }, ALL_OUTER, i, out),
+        walk(slide, { x0: i, y0: 0, x1: i + 1, y1: 1 }, ALL_OUTER, i, [i], out),
       );
       break;
     case 'seamless':
-      walk(layout.root, { x0: 0, y0: 0, x1: layout.slideCount, y1: 1 }, ALL_OUTER, null, out);
+      walk(layout.root, { x0: 0, y0: 0, x1: layout.slideCount, y1: 1 }, ALL_OUTER, null, [], out);
       break;
   }
   return out;
@@ -78,9 +80,9 @@ export function childRects(direction: 'row' | 'column', sizes: readonly number[]
   return rects;
 }
 
-function walk(node: LayoutNode, rect: Rect, outer: OuterEdges, slide: number | null, out: LeafRect[]): void {
+function walk(node: LayoutNode, rect: Rect, outer: OuterEdges, slide: number | null, path: number[], out: LeafRect[]): void {
   if (node.kind !== 'split') {
-    out.push({ node, rect, outer, slide });
+    out.push({ node, rect, outer, slide, path });
     return;
   }
   const rects = childRects(node.direction, node.sizes, rect);
@@ -90,7 +92,7 @@ function walk(node: LayoutNode, rect: Rect, outer: OuterEdges, slide: number | n
       node.direction === 'row'
         ? { ...outer, left: outer.left && i === 0, right: outer.right && i === last }
         : { ...outer, top: outer.top && i === 0, bottom: outer.bottom && i === last };
-    walk(child, rects[i]!, childOuter, slide, out);
+    walk(child, rects[i]!, childOuter, slide, [...path, i], out);
   });
 }
 

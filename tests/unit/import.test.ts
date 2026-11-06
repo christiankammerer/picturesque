@@ -104,3 +104,17 @@ describe('PRF-05 / PRF-01 limits', () => {
     expect(previewSize(1200, 800)).toEqual({ width: 1200, height: 800 });
   });
 });
+
+describe('HEIC colour space', () => {
+  it('reads the colr box and recognises Display P3', async () => {
+    const { heicColourSpace, iccIsDisplayP3 } = await import('../../src/shared/decode/colour.ts');
+    const p3 = readHeader(fixture('display-p3.heic'), 'heic');
+    expect(p3.heifColour?.type).toBe('icc');
+    expect(heicColourSpace(p3)).toBe('display-p3');
+    expect(heicColourSpace(readHeader(fixture('landscape.heic'), 'heic'))).toBe('srgb');
+    expect(iccIsDisplayP3(new Uint8Array(readFileSync(new URL('../../resources/icc/sRGB-v2-magic.icc', import.meta.url))))).toBe(false);
+    expect(heicColourSpace({ width: 1, height: 1, heifColour: { type: 'nclx', primaries: 12, transfer: 13 } })).toBe('display-p3');
+    expect(heicColourSpace({ width: 1, height: 1, heifColour: { type: 'nclx', primaries: 1, transfer: 13 } })).toBe('srgb');
+    expect(iccIsDisplayP3(new Uint8Array(10))).toBe(false);
+  });
+});

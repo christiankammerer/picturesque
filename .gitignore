@@ -7,3 +7,4 @@ tests/golden/__output__/
 *.tmp
 tests/e2e/__output__/
 tests/e2e/__report__/
+tests/e2e/__demo__/

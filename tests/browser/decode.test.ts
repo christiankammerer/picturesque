@@ -185,3 +185,39 @@ describe('Photos-panel thumbnails', () => {
     }
   });
 });
+
+describe('HEIC colour', () => {
+  /** Display P3 → sRGB for one 0..255 colour (both use the sRGB transfer curve). */
+  function p3ToSrgb(rgb: [number, number, number]): [number, number, number] {
+    const lin = rgb.map((v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+    // P3 (D65) → XYZ → sRGB (D65), combined.
+    const m = [
+      [1.2249, -0.2247, 0],
+      [-0.042, 1.0419, 0],
+      [-0.0197, -0.0786, 1.0979],
+    ];
+    const out = m.map((row) => row.reduce((s, k, i) => s + k * lin[i]!, 0));
+    return out.map((c) => {
+      const v = Math.min(1, Math.max(0, c));
+      return Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055));
+    }) as [number, number, number];
+  }
+
+  it('a Display P3 HEIC is converted to sRGB, not shown as if it were sRGB', async () => {
+    const { default: url } = await import('../fixtures/photos/display-p3.heic?url');
+    const bmp = await decodePhoto(await bytesOf(url), 'heic');
+    const left = rgbAt(bmp, 0.25, 0.5);
+    const right = rgbAt(bmp, 0.75, 0.5);
+    const close = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]!) <= 4);
+    expect(close(left, p3ToSrgb([200, 60, 60])), `left ${left}`).toBe(true);
+    expect(close(right, p3ToSrgb([60, 160, 90])), `right ${right}`).toBe(true);
+    // And clearly not the raw P3 numbers.
+    expect(close(left, [200, 60, 60])).toBe(false);
+  });
+
+  it('an sRGB HEIC is unchanged', async () => {
+    const bmp = await decodePhoto(await bytesOf(landscapeHeic), 'heic');
+    const [r, g, b] = rgbAt(bmp, 0.1, 0.1);
+    expect(Math.abs(r - 229) + Math.abs(g - 57) + Math.abs(b - 53)).toBeLessThan(12);
+  });
+});

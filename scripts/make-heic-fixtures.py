@@ -52,6 +52,7 @@ def save(name: str, im: Image.Image, orientation: int | None = None) -> None:
 OUT.mkdir(parents=True, exist_ok=True)
 save('landscape.heic', pattern(1200, 800))
 save('rotated.heic', pattern(1200, 800), orientation=6)
+save('portrait.heic', pattern(900, 1200))
 print(f'wrote {OUT}')
 
 
@@ -70,3 +71,13 @@ try:
     pattern(30, 20).save(OUT / 'refused.avif', 'AVIF')
 except (KeyError, OSError) as e:
     print(f'no AVIF encoder ({e}); skipping refused.avif')
+
+
+# A Display P3 HEIC, as iPhones write them: two flat patches, left
+# (200, 60, 60) and right (60, 160, 90), in P3 values, with the Display P3
+# ICC profile (CC0, Compact-ICC-Profiles) in its colr box.
+P3_ICC = (OUT.parent / 'icc' / 'DisplayP3-v2-magic.icc').read_bytes()
+p3 = Image.new('RGB', (400, 200), (200, 60, 60))
+ImageDraw.Draw(p3).rectangle([200, 0, 399, 199], fill=(60, 160, 90))
+p3.info['icc_profile'] = P3_ICC
+pillow_heif.from_pillow(p3).save(OUT / 'display-p3.heic', quality=100)

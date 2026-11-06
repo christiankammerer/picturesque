@@ -21,7 +21,7 @@ export async function decodePhoto(bytes: Uint8Array<ArrayBuffer>, format: PhotoF
   const resize: ImageBitmapOptions = size ? { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'high' } : {};
   if (format === 'heic') {
     const full = await decodeHeic(bytes);
-    return createImageBitmap(full, resize);
+    return createImageBitmap(full, { colorSpaceConversion: 'default', ...resize });
   }
   return createImageBitmap(new Blob([bytes], { type: MIME_TYPES[format] }), {
     imageOrientation: 'from-image',
