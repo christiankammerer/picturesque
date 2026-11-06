@@ -45,4 +45,7 @@ A reusable starting point for a Post: a Layout plus its styling, without photos.
 ## Style Preset
 A named set of Layout styling (gap, corner radius, border, background) that can be applied to any Layout in one click, independent of the Layout itself.
 
+## Project
+A Post saved to disk so it can be reopened and edited, together with copies of all its photos. One Project holds exactly one Post; an export is not a Project.
+
 _Avoid_: "slides" to mean the whole product output; say Carousel (the post) or Slide (one image of it).
