@@ -118,12 +118,12 @@ describe('RND-05 drawing order', () => {
   };
 
   it('golden: empty Cell as placeholder (editor)', async () => {
-    await expectGolden('rnd05-placeholder', renderToCanvas(post, photos, { scale: 540, emptyCells: 'placeholder' }));
+    await expectGolden('rnd05-placeholder', renderToCanvas(post, photos, { scale: 540, emptyCells: 'placeholder' }), { perPlatform: true });
   });
 
   it('golden: empty Cell as background (export)', async () => {
     const canvas = renderToCanvas(post, photos, { scale: 540, emptyCells: 'background' });
-    await expectGolden('rnd05-background', canvas);
+    await expectGolden('rnd05-background', canvas, { perPlatform: true });
     // The empty Cell and the Spacer show the background, with no border.
     const img = pixels(canvas);
     const bg = '#f4efe6';
@@ -262,10 +262,10 @@ describe('RND-09 text', () => {
     ],
   };
   it('golden: text at scale 540', async () => {
-    await expectGolden('rnd09-text-540', renderToCanvas(post, photos, { scale: 540 }), { channel: 2, pixels: 0.005 });
+    await expectGolden('rnd09-text-540', renderToCanvas(post, photos, { scale: 540 }), { channel: 2, pixels: 0.005, perPlatform: true });
   });
   it('golden: text at scale 1080', async () => {
-    await expectGolden('rnd09-text-1080', renderToCanvas(post, photos, { scale: 1080 }), { channel: 2, pixels: 0.005 });
+    await expectGolden('rnd09-text-1080', renderToCanvas(post, photos, { scale: 1080 }), { channel: 2, pixels: 0.005, perPlatform: true });
   });
 });
 

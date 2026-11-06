@@ -7,6 +7,12 @@
 // differ by more than 2/255 in any channel. On failure the actual image and a
 // diff are written to tests/golden/__output__/.
 //
+// Text is rasterised by each OS's own font backend (FreeType, DirectWrite,
+// Core Text), so glyph edges differ slightly between OSes. Golden tests that
+// draw text pass `perPlatform: true` and keep one reference per OS
+// (<name>.linux.png, <name>.darwin.png, <name>.win32.png). Everything else
+// shares one reference across all three.
+//
 // Updating references is deliberate: `npm run test:golden:update`, then
 // review the changed PNGs before committing.
 
@@ -21,6 +27,7 @@ import interBold from '@fontsource/inter/files/inter-latin-700-normal.woff2?url'
 declare module 'vitest' {
   export interface ProvidedContext {
     updateGolden: boolean;
+    platform: string;
   }
 }
 
@@ -32,6 +39,11 @@ export interface Tolerance {
 }
 
 export const DEFAULT_TOLERANCE: Tolerance = { channel: 2, pixels: 0.001 };
+
+export interface GoldenOptions extends Partial<Tolerance> {
+  /** Keep one reference per OS (for anything that draws text). */
+  perPlatform?: boolean;
+}
 
 export function renderToCanvas(
   post: Post,
@@ -116,8 +128,10 @@ function imageDataCanvas(img: ImageData): OffscreenCanvas {
 }
 
 /** Compare a canvas with its stored reference (or write it, in update mode). */
-export async function expectGolden(name: string, canvas: OffscreenCanvas, tolerance: Tolerance = DEFAULT_TOLERANCE): Promise<void> {
-  const refPath = `tests/golden/__golden__/${name}.png`;
+export async function expectGolden(name: string, canvas: OffscreenCanvas, options: GoldenOptions = {}): Promise<void> {
+  const tolerance: Tolerance = { ...DEFAULT_TOLERANCE, ...options };
+  const file = options.perPlatform ? `${name}.${inject('platform')}` : name;
+  const refPath = `tests/golden/__golden__/${file}.png`;
   if (inject('updateGolden')) {
     await commands.writeFile(refPath, await png(canvas), 'base64');
     return;
@@ -131,7 +145,7 @@ export async function expectGolden(name: string, canvas: OffscreenCanvas, tolera
   const actual = pixels(canvas);
   const fraction = diffFraction(actual, ref, tolerance.channel);
   if (fraction > tolerance.pixels) {
-    await commands.writeFile(`tests/golden/__output__/${name}.actual.png`, await png(canvas), 'base64');
+    await commands.writeFile(`tests/golden/__output__/${file}.actual.png`, await png(canvas), 'base64');
     if (ref.width === actual.width && ref.height === actual.height) {
       const diff = new ImageData(actual.width, actual.height);
       for (let i = 0; i < diff.data.length; i += 4) {
@@ -143,11 +157,11 @@ export async function expectGolden(name: string, canvas: OffscreenCanvas, tolera
         const on = d > tolerance.channel;
         diff.data.set(on ? [255, 0, 0, 255] : [ref.data[i]! / 4, ref.data[i + 1]! / 4, ref.data[i + 2]! / 4, 255], i);
       }
-      await commands.writeFile(`tests/golden/__output__/${name}.diff.png`, await png(imageDataCanvas(diff)), 'base64');
+      await commands.writeFile(`tests/golden/__output__/${file}.diff.png`, await png(imageDataCanvas(diff)), 'base64');
     }
     throw new Error(
       `${name}: ${(fraction * 100).toFixed(3)}% of pixels differ (allowed ${(tolerance.pixels * 100).toFixed(3)}%); ` +
-        `see tests/golden/__output__/${name}.*.png`,
+        `see tests/golden/__output__/${file}.*.png`,
     );
   }
 }

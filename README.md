@@ -29,7 +29,9 @@ node scripts/export-headless.ts <post.json> <out-dir> [--photos <dir>]
 
 ### Golden-image tests
 
-Renderer tests compare against reference PNGs in `tests/golden/__golden__/`. A changed reference is a deliberate, reviewed change: run `npm run test:golden:update`, look at every changed PNG, and commit them with the change that caused them. On failure, the actual image and a diff are written to `tests/golden/__output__/`.
+Renderer tests compare against reference PNGs in `tests/golden/__golden__/`. A changed reference is a deliberate, reviewed change: run `npm run test:golden:update`, look at every changed PNG, and commit them with the change that caused them. On failure, the actual image and a diff are written to `tests/golden/__output__/`, and CI uploads them as artefacts.
+
+Tests that draw text keep one reference per OS (`<name>.linux.png`, `.darwin.png`, `.win32.png`), because each OS rasterises glyph edges with its own font backend. To update the macOS or Windows references, review the `actual.png` files in that OS's CI artefact and copy them in.
 
 ## Licence
 

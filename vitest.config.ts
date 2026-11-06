@@ -17,7 +17,7 @@ export default defineConfig({
           name: 'golden',
           include: ['tests/golden/**/*.test.ts'],
           testTimeout: 60_000,
-          provide: { updateGolden: process.env.UPDATE_GOLDEN === '1' },
+          provide: { updateGolden: process.env.UPDATE_GOLDEN === '1', platform: process.platform },
           browser: {
             enabled: true,
             headless: true,
