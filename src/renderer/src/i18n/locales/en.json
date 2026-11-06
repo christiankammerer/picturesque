@@ -2,5 +2,12 @@
   "app": {
     "name": "Picturesque",
     "comingSoon": "The editor is on its way."
+  },
+  "import": {
+    "unsupported": "{{name}} isn't a supported photo. Picturesque opens JPEG, PNG, WebP and HEIC.",
+    "tooLarge": "{{name}} is larger than 100 megapixels.",
+    "unreadable": "{{name}} couldn't be read.",
+    "overLimit_one": "Projects can hold up to 100 photos. {{count}} wasn't added.",
+    "overLimit_other": "Projects can hold up to 100 photos. {{count}} weren't added."
   }
 }

@@ -49,3 +49,17 @@ export function expectCovered(r: PxRect, bw: number, bh: number, framing: Framin
     expect(v).toBeLessThanOrEqual(bh * (1 + 1e-6));
   }
 }
+
+/** A PNG signature and IHDR claiming a size, with `salt` appended to vary the hash. */
+export function fakePng(width: number, height: number, salt = 0): Uint8Array<ArrayBuffer> {
+  const b = new Uint8Array(8 + 25 + 4);
+  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  const v = new DataView(b.buffer);
+  v.setUint32(8, 13);
+  b.set([0x49, 0x48, 0x44, 0x52], 12); // IHDR
+  v.setUint32(16, width);
+  v.setUint32(20, height);
+  b.set([8, 2, 0, 0, 0], 24);
+  v.setUint32(33, salt);
+  return b;
+}
