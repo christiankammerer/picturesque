@@ -45,6 +45,9 @@ A reusable starting point for a Post: a Layout plus its styling, without photos.
 ## Style Preset
 A named set of Layout styling (gap, corner radius, border, background) that can be applied to any Layout in one click, independent of the Layout itself.
 
+## Auto-fill
+Placing unplaced photos into a Layout's empty Cells automatically, in the Photos panel's order, preferring photos whose orientation matches each Cell. It never moves photos the user has placed.
+
 ## Project
 A Post saved to disk so it can be reopened and edited, together with copies of all its photos. One Project holds exactly one Post; an export is not a Project.
 
