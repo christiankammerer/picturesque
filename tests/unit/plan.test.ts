@@ -23,13 +23,13 @@ describe('EXP-01 export size', () => {
 });
 
 describe('EXP-04 decode size', () => {
-  it('decodes at the size the Cell draws the photo', () => {
-    // A 4000×3000 photo covering a 1080×1080 Cell is drawn 1440×1080.
-    const sizes = decodeSizes(single(1), { p: meta('p', 4000, 3000) });
-    expect(sizes.get('p')).toEqual({ width: 1440, height: 1080 });
+  it('decodes at the size the Cell draws the photo in the 2× render', () => {
+    // A 6000×4500 photo covering a 2160×2160 Cell (1080 × 2) is drawn 2880×2160.
+    const sizes = decodeSizes(single(1), { p: meta('p', 6000, 4500) });
+    expect(sizes.get('p')).toEqual({ width: 2880, height: 2160 });
   });
   it('scales with zoom', () => {
-    expect(decodeSizes(single(2), { p: meta('p', 4000, 3000) }).get('p')).toEqual({ width: 2880, height: 2160 });
+    expect(decodeSizes(single(1.5), { p: meta('p', 6000, 4500) }).get('p')).toEqual({ width: 4320, height: 3240 });
   });
   it('is never larger than the original', () => {
     expect(decodeSizes(single(10), { p: meta('p', 4000, 3000) }).get('p')).toEqual({ width: 4000, height: 3000 });
@@ -41,10 +41,25 @@ describe('EXP-04 decode size', () => {
       layout: { postType: 'collage', root: { kind: 'split', direction: 'row', sizes: [0.7, 0.3], children: [cell('a', 'p'), cell('b', 'p')] } },
     };
     const w = decodeSizes(post, { p: meta('p', 6000, 6000) }).get('p')!.width;
-    expect(w).toBe(1080); // the 756×1080 Cell needs a 1080×1080 square
+    expect(w).toBe(2160); // at 2×, the 1512×2160 Cell needs a 2160×2160 square
   });
   it('skips empty Cells', () => {
     const post: Post = { ...single(1), layout: { postType: 'collage', root: cell('a') } };
     expect(decodeSizes(post, {}).size).toBe(0);
+  });
+});
+
+describe('PRF-02 photo lifetimes', () => {
+  it('a photo is needed from the first to the last Slide it shows in, margins included', async () => {
+    const { photoSlideRanges } = await import('../../src/shared/export/plan.ts');
+    const post: Post = {
+      type: 'seamless', aspectRatio: '4:5',
+      layout: { postType: 'seamless', slideCount: 4, root: { kind: 'split', direction: 'row', sizes: [0.25, 0.25, 0.5], children: [cell('a', 'p'), cell('b', 'q'), cell('c', 'p')] } },
+      style: STYLE, textBoxes: [],
+    };
+    // a: 0..1 (Slide 0, and the margin reaches into Slide 1); b: 1..2; c: 2..4.
+    const r = photoSlideRanges(post);
+    expect(r.get('p')).toEqual([0, 3]);
+    expect(r.get('q')).toEqual([0, 2]);
   });
 });

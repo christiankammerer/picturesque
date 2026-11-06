@@ -4,10 +4,16 @@
 // OffscreenCanvas and createImageBitmap exist: an export worker in the app
 // (PRF-06), or a headless Chromium page for scripts and tests. Writing the
 // files is the caller's job (see src/main/export/write-files.ts).
+//
+// EXP-03: each Slide is rendered at 2× (scale 2160) with a margin of
+// SLICE_MARGIN px on each side, then halved with Lanczos-3. That gives
+// exactly the pixels of one full-canvas render and downscale, without a
+// canvas wider than Chromium allows, and lets each photo be freed after its
+// last Slide (PRF-02).
 
 import { decodePhoto } from '../decode/decode.ts';
 import { canvasPixelSize } from '../model/post.ts';
-import { slideCountOf, type PhotoMeta, type Post } from '../model/schema.ts';
+import { RATIO_HEIGHT, slideCountOf, type PhotoMeta, type Post } from '../model/schema.ts';
 import { render, type PhotoSource } from '../render/render.ts';
 import { exifDateTime } from './exif.ts';
 import { rewriteExportMetadata } from './jpeg.ts';
@@ -17,8 +23,12 @@ import {
   EXPORT_SCALE,
   FALLBACK_QUALITY,
   MAX_FILE_BYTES,
+  photoSlideRanges,
+  RENDER_SCALE,
+  SLICE_MARGIN,
   SLIDE_TIME_STEP_MS,
 } from './plan.ts';
+import { halveLanczos } from './resample.ts';
 
 export interface ExportInput {
   post: Post;
@@ -55,37 +65,35 @@ export async function exportPost(input: ExportInput): Promise<ExportedSlide[]> {
   const check = () => {
     if (signal?.aborted) throw new ExportCancelled();
   };
-
-  // Decode every placed photo from its original, at the size its Cell needs.
+  const count = slideCountOf(post.layout);
+  const sizes = decodeSizes(post, input.photos);
+  const ranges = photoSlideRanges(post);
   const bitmaps = new Map<string, ImageBitmap>();
+  const limit = input.maxFileBytes ?? MAX_FILE_BYTES;
+  const out: ExportedSlide[] = [];
+
   try {
-    for (const [photoId, size] of decodeSizes(post, input.photos)) {
-      check();
-      const blob = await input.readPhoto(photoId);
-      const meta = input.photos[photoId]!;
-      const resize = size.width < meta.width || size.height < meta.height;
-      // Originals are decoded one at a time, and each full-size decode is
-      // dropped as soon as its Cell-sized bitmap exists. The Cell-sized
-      // bitmaps are then held together for the single render (EXP-03), which
-      // is a looser reading of PRF-02's "draws it, and frees it before
-      // decoding the next".
-      const bitmap = await decodePhoto(new Uint8Array(await blob.arrayBuffer()), meta.ext, resize ? size : undefined);
-      bitmaps.set(photoId, bitmap);
-    }
-    check();
-
-    // EXP-03: one render of the whole canvas…
-    const full = renderFull(post, (id) => bitmaps.get(id));
-    for (const b of bitmaps.values()) b.close();
-    bitmaps.clear();
-
-    // …sliced at the exact Slide edges.
-    const count = slideCountOf(post.layout);
-    const limit = input.maxFileBytes ?? MAX_FILE_BYTES;
-    const out: ExportedSlide[] = [];
     for (let i = 0; i < count; i++) {
+      // PRF-02: decode the originals this Slide needs, one at a time, at their 2× size.
+      for (const [photoId, [first]] of ranges) {
+        if (first > i || bitmaps.has(photoId)) continue;
+        check();
+        const meta = input.photos[photoId]!;
+        const size = sizes.get(photoId)!;
+        const resize = size.width < meta.width || size.height < meta.height;
+        const bytes = new Uint8Array(await (await input.readPhoto(photoId)).arrayBuffer());
+        bitmaps.set(photoId, await decodePhoto(bytes, meta.ext, resize ? size : undefined));
+      }
       check();
-      const slice = sliceSlide(full, i);
+
+      const slice = renderSlide(post, (id) => bitmaps.get(id), i);
+      for (const [photoId, [, last]] of ranges) {
+        if (last === i) {
+          bitmaps.get(photoId)?.close();
+          bitmaps.delete(photoId);
+        }
+      }
+
       const time = input.startTime + i * SLIDE_TIME_STEP_MS;
       const stamp = exifDateTime(new Date(time));
       let bytes = await encode(slice, EXPORT_QUALITY, stamp);
@@ -103,25 +111,49 @@ export async function exportPost(input: ExportInput): Promise<ExportedSlide[]> {
   }
 }
 
-/** EXP-03: render the whole canvas once, at scale 1080, empty Cells as background. */
-export function renderFull(post: Post, photos: PhotoSource): OffscreenCanvas {
-  const { width, height } = canvasPixelSize(post, EXPORT_SCALE);
-  const full = new OffscreenCanvas(width, height);
-  const ctx = full.getContext('2d', { alpha: false, colorSpace: 'srgb' });
+/** EXP-03: Slide `index` at 1080 px wide: its part of the 2× render (with margins), halved with Lanczos-3. */
+export function renderSlide(post: Post, photos: PhotoSource, index: number): OffscreenCanvas {
+  const count = slideCountOf(post.layout);
+  const fullWidth = count * RENDER_SCALE;
+  const height2 = Math.round(RENDER_SCALE * RATIO_HEIGHT[post.aspectRatio]);
+  const x0 = Math.max(0, index * RENDER_SCALE - SLICE_MARGIN);
+  const x1 = Math.min(fullWidth, (index + 1) * RENDER_SCALE + SLICE_MARGIN);
+
+  const strip = new OffscreenCanvas(x1 - x0, height2);
+  const ctx = strip.getContext('2d', { alpha: false, colorSpace: 'srgb', willReadFrequently: true });
   if (!ctx) throw new Error('no 2D context');
-  render(ctx, post, photos, { scale: EXPORT_SCALE, emptyCells: 'background' });
-  return full;
+  ctx.translate(-x0, 0);
+  render(ctx, post, photos, {
+    scale: RENDER_SCALE,
+    slides: { from: Math.max(0, index - 1), to: Math.min(count - 1, index + 1) },
+    emptyCells: 'background',
+  });
+  const pixels = halveLanczos(ctx.getImageData(0, 0, strip.width, height2).data, strip.width, height2, {
+    offsetX: index * RENDER_SCALE - x0,
+    outWidth: EXPORT_SCALE,
+  });
+  return toCanvas(pixels, EXPORT_SCALE, height2 / 2);
 }
 
-/** EXP-03 / RND-04: Slide i is the exact pixel columns i × 1080 … (i + 1) × 1080 − 1,
- *  copied without resampling. */
-export function sliceSlide(full: OffscreenCanvas, index: number): OffscreenCanvas {
-  const ctx = full.getContext('2d');
-  const slice = new OffscreenCanvas(EXPORT_SCALE, full.height);
-  const sctx = slice.getContext('2d', { alpha: false, colorSpace: 'srgb' });
-  if (!ctx || !sctx) throw new Error('no 2D context');
-  sctx.putImageData(ctx.getImageData(index * EXPORT_SCALE, 0, EXPORT_SCALE, full.height), 0, 0);
-  return slice;
+/**
+ * The reference for EXP-03's check: the whole canvas rendered once at 2×
+ * and halved. Only for Posts narrow enough to fit one canvas (tests).
+ */
+export function renderFullDownscaled(post: Post, photos: PhotoSource): OffscreenCanvas {
+  const { width, height } = canvasPixelSize(post, RENDER_SCALE);
+  const full = new OffscreenCanvas(width, height);
+  const ctx = full.getContext('2d', { alpha: false, colorSpace: 'srgb', willReadFrequently: true });
+  if (!ctx) throw new Error('no 2D context');
+  render(ctx, post, photos, { scale: RENDER_SCALE, emptyCells: 'background' });
+  return toCanvas(halveLanczos(ctx.getImageData(0, 0, width, height).data, width, height), width / 2, height / 2);
+}
+
+function toCanvas(pixels: Uint8ClampedArray<ArrayBuffer>, width: number, height: number): OffscreenCanvas {
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d', { alpha: false, colorSpace: 'srgb' });
+  if (!ctx) throw new Error('no 2D context');
+  ctx.putImageData(new ImageData(pixels, width, height), 0, 0);
+  return canvas;
 }
 
 /** EXP-02: baseline JPEG at a quality, with the sRGB profile and only DateTimeOriginal. */

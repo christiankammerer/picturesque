@@ -5,7 +5,7 @@
 **PRF-01** **Preview copies.** On import, a worker decodes each photo (HEIC via the libheif WASM module, others via `createImageBitmap`) and applies the EXIF orientation. It makes a **preview copy with a 2048 px long edge**, which the editor, filmstrip, thumbnails and Preview as post use. Preview copies are kept in memory while the Project is open and cached on disk (PRJ-13), keyed by the photo's hash.
 *Check:* during editing, no full-resolution bitmap is held in memory (heap snapshot in the benchmark).
 
-**PRF-02** **Export decodes originals one at a time.** For each placed photo, export decodes the original, resizes it with a high-quality filter to the size its Cell needs at scale 1080 and its zoom (never larger than the original), draws it, and frees it before decoding the next. The export canvas is the only large surface held.
+**PRF-02** **Export decodes originals one at a time.** For each placed photo, export decodes the original and resizes it with a high-quality filter to the size its Cell needs at the 2× render scale (EXP-03) and its zoom, never larger than the original. Each photo is freed as soon as the last Slide that shows it has been rendered. Apart from these photos, the only large surface held is the 2× render of the current part (EXP-03).
 *Check:* peak memory during the benchmark export stays within PRF-09.
 
 **PRF-03** All decoding, hashing and resizing runs in **workers**, never on the UI thread. The UI never freezes during import, open or export.

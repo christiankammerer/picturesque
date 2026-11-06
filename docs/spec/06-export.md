@@ -10,11 +10,18 @@ Export writes the Post as JPEG files that are ready to upload to Instagram. Noth
 **EXP-02** The format is **baseline JPEG, quality 92**, in **sRGB with the sRGB ICC profile embedded**. There is no quality slider and no PNG option.
 *Check:* the exported file's JPEG quality estimate is 92 (±1), and an APP2 ICC segment containing the sRGB profile is present.
 
-**EXP-03** **One render, sliced.** The whole canvas is rendered once at scale 1080 (`slideCount × 1080` px wide) with `emptyCells: 'background'`, then sliced at the exact Slide edges (`x = i × 1080`), with no overlap and no gap. Cells and Text Boxes crossing an edge are split cleanly. Plain Carousels go through the same path.
-*Check:* golden test: for a Seamless Post with a Cell crossing Slide edge 1, the last pixel column of Slide 1 and the first of Slide 2 match the corresponding adjacent columns of the full render.
+**EXP-03** **One render, supersampled and sliced.**
+- The whole canvas is rendered at **twice the export scale** (scale 2160, so `slideCount × 2160` px wide) with `emptyCells: 'background'`.
+- It is then **downscaled by 2 with a Lanczos-3 filter** (separable, in gamma-encoded sRGB, clamped at the canvas edges) to `slideCount × 1080` px.
+- The result is sliced at the exact Slide edges (`x = i × 1080`), with no overlap and no gap. Cells and Text Boxes crossing an edge are split cleanly. Plain Carousels go through the same path.
+- The render may be done in parts, for example one Slide at a time with a margin around it (Chromium canvases are at most 32 767 px wide), provided every exported pixel equals that of a single full render and downscale, within 1/255 per channel (floating-point rounding).
 
-**EXP-04** **Photo quality:** each photo is decoded from its **original** at the size its Cell needs (PRF-02), with a high-quality filter, so there is no upscaling from preview copies.
-*Check:* exporting a 48 MP photo in a Single framed Collage shows full detail at 100% (golden test against a reference decode).
+Why: Chromium's own image resampling is softer than Lanczos, and resampling a photo again when drawing it at a fractional position blurs it further. Rendering at 2× and downscaling once with a sharp filter keeps photo detail. Measured on 16 MP camera JPEGs, the 1080 render kept 61–73% of the detail of an ideal downscale (30–33 dB PSNR against it); the 2× render with a Lanczos-3 downscale kept 92% (43 dB).
+
+*Check:* golden test: for a Seamless Post with a Cell crossing Slide edge 1, the last pixel column of Slide 1 and the first of Slide 2 match the corresponding adjacent columns of a full-canvas render and downscale, and a Slide rendered on its own equals the same Slide cut from the full result within 1/255 per channel.
+
+**EXP-04** **Photo quality:** each photo is decoded from its **original** at the size its Cell needs at the 2× render scale (PRF-02), with a high-quality filter, so there is no upscaling from preview copies, and the export keeps the photo's detail.
+*Check:* exporting a 48 MP photo in a Single framed Collage shows full detail at 100% (golden test against a reference decode). A detail test exports a smooth, finely textured grey photo and requires at least 93% of its detail (mean absolute Laplacian) and 39 dB PSNR after JPEG, against the texture's exact values at each pixel centre. (The 1080 render reached 88% and 34.8 dB; the 2× render reaches 97% and 41 dB.)
 
 **EXP-05** **Metadata:** all EXIF, XMP, IPTC and GPS data is stripped, **except** one EXIF **DateTimeOriginal** tag. It is set to the export start time plus **1 second per Slide**: Slide 1 gets the start time, Slide 2 start + 1 s, and so on. Each file's **modification time** is set the same way. As a result, phone galleries and Instagram's photo picker list the Slides in order.
 *Check:* exiftool on the exported files shows only DateTimeOriginal (plus JFIF/ICC structure), increasing by 1 s per Slide; the file mtimes match.

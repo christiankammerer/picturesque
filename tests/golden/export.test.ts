@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { beforeAll, describe, expect, it } from 'vitest';
 import { buildExifPayload, exifDateTime, TAG_DATE_TIME_ORIGINAL, TAG_ORIENTATION } from '../../src/shared/export/exif.ts';
-import { ExportCancelled, exportPost, renderFull, sliceSlide } from '../../src/shared/export/export-post.ts';
+import { ExportCancelled, exportPost, renderFullDownscaled, renderSlide } from '../../src/shared/export/export-post.ts';
 import { APP0, APP1, APP2, insertApp1 } from '../../src/shared/export/jpeg.ts';
 import { EXPORT_SCALE } from '../../src/shared/export/plan.ts';
 import { DEFAULT_FRAMING, type Framing, type LayoutNode, type PhotoMeta, type Post } from '../../src/shared/model/schema.ts';
@@ -98,19 +98,25 @@ describe('EXP-02 format', () => {
 });
 
 describe('EXP-03 one render, sliced', () => {
-  it('Slides are the exact columns of the full render, with no overlap and no gap', async () => {
+  it('each Slide rendered on its own equals the same columns of one full render and downscale, within 1/255', async () => {
     const bitmaps = new Map<string, ImageBitmap>();
     for (const [id, p] of library) bitmaps.set(id, await createImageBitmap(p.blob));
-    const full = renderFull(seamless3, (id) => bitmaps.get(id));
+    const full = renderFullDownscaled(seamless3, (id) => bitmaps.get(id));
     const fullPx = pixels(full);
     expect(full.width).toBe(3 * EXPORT_SCALE);
     for (let i = 0; i < 3; i++) {
-      const slice = pixels(sliceSlide(full, i));
-      for (const x of [0, 1, 539, 1078, 1079]) {
-        for (let y = 0; y < 1350; y += 7) {
-          expect(pixelAt(slice, x, y)).toEqual(pixelAt(fullPx, i * EXPORT_SCALE + x, y));
+      const slice = pixels(renderSlide(seamless3, (id) => bitmaps.get(id), i));
+      expect([slice.width, slice.height]).toEqual([1080, 1350]);
+      let maxDiff = 0;
+      for (let y = 0; y < 1350; y++) {
+        for (let x = 0; x < 1080; x++) {
+          const a = (y * 1080 + x) * 4;
+          const b = (y * fullPx.width + i * EXPORT_SCALE + x) * 4;
+          for (let c = 0; c < 3; c++) maxDiff = Math.max(maxDiff, Math.abs(slice.data[a + c]! - fullPx.data[b + c]!));
         }
       }
+      // Floating-point rounding of the combined transforms may differ by one level.
+      expect(maxDiff, `Slide ${i}`).toBeLessThanOrEqual(1);
     }
   });
 
@@ -172,8 +178,10 @@ describe('EXP-04 photo quality', () => {
 
     const exportErr = meanAbsDiff(exported, reference);
     const previewErr = meanAbsDiff(preview, reference);
+    // The reference here is Chromium's own downscale of the full photo, which
+    // is softer than the export (EXP-03), so only the comparison with a
+    // preview copy is meaningful. The detail test below measures sharpness.
     expect(exportErr).toBeLessThan(previewErr / 2);
-    expect(exportErr).toBeLessThan(12);
   });
 
   it('applies the EXIF orientation at decode', async () => {
@@ -281,4 +289,58 @@ describe('export pipeline', () => {
     expect(meanAbsDiff(exported, editor)).toBeLessThan(2);
     expect(diffFraction(exported, editor, 40)).toBeLessThan(0.005);
   });
+});
+
+describe('EXP-04 detail', () => {
+  /** A smooth grey texture (wavelengths ≥ 3.3 export px) at 4× the export size, and its ideal export. */
+  function texture() {
+    const W = 4320;
+    const H = 5400;
+    const value = (x: number, y: number) => {
+      const u = x / 4;
+      const v = y / 4;
+      return 128 + 40 * Math.sin((2 * Math.PI * u) / 3.3 + 0.3) + 30 * Math.sin((2 * Math.PI * v) / 4.1 + 1.1) + 25 * Math.sin((2 * Math.PI * (u + v)) / 5.7);
+    };
+    const src = new ImageData(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const g = value(x + 0.5, y + 0.5);
+      src.data.set([g, g, g, 255], (y * W + x) * 4);
+    }
+    // For a smooth texture, the ideal export pixel is the texture's value at the pixel's centre.
+    // (A 4×4 block average would itself blur the finest detail.)
+    const ideal = new Float64Array(1080 * 1350);
+    for (let y = 0; y < 1350; y++) for (let x = 0; x < 1080; x++) ideal[y * 1080 + x] = Math.min(255, Math.max(0, value(4 * x + 2, 4 * y + 2)));
+    return { src, ideal };
+  }
+  const grey = (img: ImageData) => Float64Array.from({ length: img.width * img.height }, (_, i) => img.data[i * 4]!);
+  const detail = (g: Float64Array, w: number, h: number) => {
+    let s = 0;
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      s += Math.abs(4 * g[i]! - g[i - 1]! - g[i + 1]! - g[i - w]! - g[i + w]!);
+    }
+    return s / ((w - 2) * (h - 2));
+  };
+  const psnr = (a: Float64Array, b: Float64Array) => {
+    let m = 0;
+    for (let i = 0; i < a.length; i++) m += (a[i]! - b[i]!) ** 2;
+    return 10 * Math.log10(255 ** 2 / (m / a.length));
+  };
+
+  // Calibration: the old 1080 render reached 88% and 34.8 dB; 2× with Lanczos-3 reaches 97% and 41 dB after JPEG.
+  it('keeps at least 93% of the detail and 39 dB against the ideal', async () => {
+    const { src, ideal } = texture();
+    const c = new OffscreenCanvas(src.width, src.height);
+    c.getContext('2d')!.putImageData(src, 0, 0);
+    await addPhoto('texture', c, { type: 'image/png' });
+    const post = collage(cell('a', 'texture'));
+    post.style = { ...STYLE, gap: 0 };
+    const [slide] = await exportPost(input(post));
+    const out = grey(await jpegPixels(slide!.bytes));
+    const ratio = detail(out, 1080, 1350) / detail(ideal, 1080, 1350);
+    const db = psnr(out, ideal);
+    console.log(`EXP-04 detail: ${(ratio * 100).toFixed(1)}% of the ideal, ${db.toFixed(1)} dB`);
+    expect(ratio).toBeGreaterThanOrEqual(0.93);
+    expect(db).toBeGreaterThanOrEqual(39);
+  }, 120_000);
 });
