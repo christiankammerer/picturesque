@@ -1,0 +1,58 @@
+{
+  "name": "picturesque",
+  "version": "0.1.0",
+  "description": "A free, offline desktop app for Instagram Collages, Carousels and Seamless Carousels.",
+  "license": "GPL-3.0-or-later",
+  "author": "Christian Kammerer",
+  "homepage": "https://github.com/christiankammerer/picturesque",
+  "private": true,
+  "type": "module",
+  "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "npm run test:unit && npm run test:golden",
+    "test:unit": "vitest run --project unit",
+    "test:golden": "vitest run --project golden",
+    "test:golden:update": "UPDATE_GOLDEN=1 vitest run --project golden",
+    "export:headless": "node scripts/export-headless.ts",
+    "demo": "node scripts/export-headless.ts fixtures/trip/post.json out/demo",
+    "check:milestones": "node scripts/check-milestones.ts",
+    "fixtures:trip": "node scripts/make-trip-fixture.ts"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "i18next": "^26.7.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-i18next": "^17.1.13",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "@vitest/browser": "^5.1.0",
+    "@vitest/browser-playwright": "^5.1.0",
+    "electron": "^45.2.3",
+    "electron-vite": "^6.0.0",
+    "eslint": "^10.14.0",
+    "eslint-plugin-i18next": "^6.1.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "fast-check": "^4.10.2",
+    "globals": "^17.14.0",
+    "playwright": "^1.65.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}

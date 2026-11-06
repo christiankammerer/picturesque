@@ -1,0 +1,7 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+tests/golden/__output__/
+*.tmp

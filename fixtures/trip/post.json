@@ -1,0 +1,151 @@
+{
+  "formatVersion": 1,
+  "appVersion": "0.1.0",
+  "name": "trip",
+  "post": {
+    "type": "collage",
+    "aspectRatio": "4:5",
+    "layout": {
+      "postType": "collage",
+      "root": {
+        "kind": "split",
+        "direction": "column",
+        "sizes": [
+          0.5,
+          0.5
+        ],
+        "children": [
+          {
+            "kind": "split",
+            "direction": "row",
+            "sizes": [
+              0.5,
+              0.5
+            ],
+            "children": [
+              {
+                "kind": "cell",
+                "id": "c1",
+                "photo": {
+                  "photoId": "068fdd37b8e72cb1938ff9769f2cfbac70908a04eb4893127a4bc4dc98e09a72",
+                  "framing": {
+                    "zoom": 1,
+                    "focusX": 0.62,
+                    "focusY": 0.5,
+                    "rotate90": 0,
+                    "straighten": 0
+                  }
+                }
+              },
+              {
+                "kind": "cell",
+                "id": "c2",
+                "photo": {
+                  "photoId": "3c20df2988697652533743528173e9d7337aebb854a352806725ff6a34f5864e",
+                  "framing": {
+                    "zoom": 1,
+                    "focusX": 0.5,
+                    "focusY": 0.5,
+                    "rotate90": 0,
+                    "straighten": 0
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "split",
+            "direction": "row",
+            "sizes": [
+              0.5,
+              0.5
+            ],
+            "children": [
+              {
+                "kind": "cell",
+                "id": "c3",
+                "photo": {
+                  "photoId": "e6159aed9e53b8b2486c856b0a06d71bc6dbcc40f98e8d194eb96d3c72918f1f",
+                  "framing": {
+                    "zoom": 1,
+                    "focusX": 0.5,
+                    "focusY": 0.5,
+                    "rotate90": 0,
+                    "straighten": 0
+                  }
+                }
+              },
+              {
+                "kind": "cell",
+                "id": "c4",
+                "photo": {
+                  "photoId": "58116bed502ea897fe45de24aa253d71ce12a26de8964b655fe1216de1c86665",
+                  "framing": {
+                    "zoom": 1.4,
+                    "focusX": 0.5,
+                    "focusY": 0.55,
+                    "rotate90": 0,
+                    "straighten": 0
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "style": {
+      "gap": 0.02,
+      "cornerRadius": 0.03,
+      "borderWidth": 0,
+      "borderColor": "#000000",
+      "background": "#f4efe6"
+    },
+    "textBoxes": [],
+    "sourceTemplate": {
+      "id": "grid-2x2",
+      "name": "Grid 2×2",
+      "builtIn": true
+    }
+  },
+  "photos": {
+    "068fdd37b8e72cb1938ff9769f2cfbac70908a04eb4893127a4bc4dc98e09a72": {
+      "id": "068fdd37b8e72cb1938ff9769f2cfbac70908a04eb4893127a4bc4dc98e09a72",
+      "ext": "jpg",
+      "originalName": "IMG_0001.jpg",
+      "captureDate": "2026-07-14T19:42:10+02:00",
+      "width": 2400,
+      "height": 1600
+    },
+    "3c20df2988697652533743528173e9d7337aebb854a352806725ff6a34f5864e": {
+      "id": "3c20df2988697652533743528173e9d7337aebb854a352806725ff6a34f5864e",
+      "ext": "jpg",
+      "originalName": "IMG_0002.jpg",
+      "captureDate": "2026-07-15T11:03:55+02:00",
+      "width": 1600,
+      "height": 2400
+    },
+    "e6159aed9e53b8b2486c856b0a06d71bc6dbcc40f98e8d194eb96d3c72918f1f": {
+      "id": "e6159aed9e53b8b2486c856b0a06d71bc6dbcc40f98e8d194eb96d3c72918f1f",
+      "ext": "jpg",
+      "originalName": "IMG_0003.jpg",
+      "captureDate": "2026-07-16T09:20:31+02:00",
+      "width": 1800,
+      "height": 1800
+    },
+    "58116bed502ea897fe45de24aa253d71ce12a26de8964b655fe1216de1c86665": {
+      "id": "58116bed502ea897fe45de24aa253d71ce12a26de8964b655fe1216de1c86665",
+      "ext": "jpg",
+      "originalName": "IMG_0004.jpg",
+      "captureDate": "2026-07-16T22:14:02+02:00",
+      "width": 2400,
+      "height": 1600
+    }
+  },
+  "panelOrder": [
+    "068fdd37b8e72cb1938ff9769f2cfbac70908a04eb4893127a4bc4dc98e09a72",
+    "3c20df2988697652533743528173e9d7337aebb854a352806725ff6a34f5864e",
+    "e6159aed9e53b8b2486c856b0a06d71bc6dbcc40f98e8d194eb96d3c72918f1f",
+    "58116bed502ea897fe45de24aa253d71ce12a26de8964b655fe1216de1c86665"
+  ]
+}
